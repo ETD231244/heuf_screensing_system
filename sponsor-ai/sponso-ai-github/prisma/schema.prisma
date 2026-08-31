@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model District {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  applicants Applicant[]
+}
+
+model Institution {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  category     String
+  applications Application[]
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         String     @default("STUDENT")
+  createdAt    DateTime   @default(now())
+  applicant    Applicant?
+}
+
+model Applicant {
+  id                           String        @id @default(cuid())
+  userId                       String        @unique
+  givenName                    String
+  surname                      String
+  gender                       String
+  dateOfBirth                  String?
+  age                          Int?
+  phone                        String
+  photoPath                    String?
+  clanName                     String?
+  wardVillage                  String?
+  llgName                      String?
+  districtId                   String?
+  province                     String?       @default("Hela")
+  fatherFullName               String?
+  fatherOccupation             String?
+  fatherClan                   String?
+  fatherWard                   String?
+  fatherLlg                    String?
+  fatherDistrict               String?
+  fatherProvince               String?
+  fatherPhone                  String?
+  fatherEmail                  String?
+  motherFullName               String?
+  motherOccupation             String?
+  motherClan                   String?
+  motherWard                   String?
+  motherLlg                    String?
+  motherDistrict               String?
+  motherProvince               String?
+  motherPhone                  String?
+  motherEmail                  String?
+  eligibilityPath              String        @default("HELA_ORIGIN")
+  publicServantWho             String?
+  publicServantDepartment      String?
+  publicServantOccupation      String?
+  publicServantYears           Int?
+  publicServantSupervisor      String?
+  publicServantSupervisorPhone String?
+  parentOriginDistrict         String?
+  parentOriginProvince         String?
+  district                     District?     @relation(fields: [districtId], references: [id])
+  user                         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications                 Application[]
+}
+
+model Application {
+  id                  String      @id @default(cuid())
+  applicantId         String
+  institutionId       String
+  academicYear        String      @default("2026")
+  programName         String
+  studyType           String?
+  studyLevel          String
+  yearOfStudy         String
+  expectedCompletion  String?
+  institutionProvince String?
+  registrarPhone      String?
+  registrarEmail      String?
+  applicantType       String
+  lastSecondarySchool String?
+  yearCompleted       String?
+  feeCategory         String
+  otherFeeType        String?
+  tuitionFees         String?
+  accountName         String?
+  accountNumber       String?
+  bankName            String?
+  bankBranch          String?
+  witnessName         String?
+  witnessTitle        String?
+  witnessVillage      String?
+  witnessDistrict     String?
+  witnessPhone        String?
+  declaredAt          DateTime?
+  status              String      @default("DRAFT")
+  statusNote          String?
+  submittedAt         DateTime?
+  decidedAt           DateTime?
+  decidedByEmail      String?
+  screeningJson       String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  institution         Institution @relation(fields: [institutionId], references: [id])
+  applicant           Applicant   @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  documents           Document[]
+
+  @@index([status])
+  @@index([academicYear])
+}
+
+model Document {
+  id            String      @id @default(cuid())
+  applicationId String
+  type          String
+  originalName  String
+  storedPath    String      @default("")
+  mimeType      String
+  sizeBytes     Int
+  contents      Bytes?
+  uploadedAt    DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, type])
+}
