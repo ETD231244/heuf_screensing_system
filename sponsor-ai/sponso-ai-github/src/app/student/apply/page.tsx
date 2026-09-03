@@ -28,7 +28,7 @@ export default async function ApplyPage() {
 
   if (!user?.applicant) redirect("/register");
   const application = user.applicant.applications[0];
-  if (application && application.status !== "DRAFT") {
+  if (application && application.status !== "DRAFT" && application.status !== "MORE_INFO") {
     redirect("/student");
   }
 
@@ -41,6 +41,7 @@ export default async function ApplyPage() {
     age: a.age ? String(a.age) : "",
     phone: a.phone ?? "",
     email: user.email,
+    studentId: a.studentId ?? "",
     clanName: a.clanName ?? "",
     wardVillage: a.wardVillage ?? "",
     llgName: a.llgName ?? "",
@@ -107,7 +108,15 @@ export default async function ApplyPage() {
       <ApplicationWizard
         initial={initial}
         institutions={institutions}
-        documents={application?.documents ?? []}
+        documents={
+          application?.documents.map((doc) => ({
+            id: doc.id,
+            type: doc.type,
+            originalName: doc.originalName,
+            sizeBytes: doc.sizeBytes,
+            screeningStatus: doc.screeningStatus,
+          })) ?? []
+        }
       />
     </div>
   );

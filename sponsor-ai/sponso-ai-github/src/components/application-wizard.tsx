@@ -8,18 +8,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/field";
 import {
+  COMMON_PROGRAMS,
   DOCUMENT_LABELS,
   ELIGIBILITY_LABELS,
   FEE_CATEGORY_LABELS,
   HELA_DISTRICTS,
   PNG_PROVINCES,
+  SCREENING_STATUS_LABELS,
   STUDY_LEVEL_LABELS,
+  YEAR_LEVELS,
+  llgsForDistrict,
   requiredDocuments,
 } from "@/lib/constants";
 import { fileSizeLabel } from "@/lib/utils";
+import { Alert } from "@/components/ui/alert";
 
 type Institution = { id: string; code: string; name: string; category: string };
-type Doc = { id: string; type: string; originalName: string; sizeBytes: number };
+type Doc = {
+  id: string;
+  type: string;
+  originalName: string;
+  sizeBytes: number;
+  screeningStatus?: string | null;
+};
 
 export type WizardValues = {
   givenName: string;
@@ -29,6 +40,7 @@ export type WizardValues = {
   age: string;
   phone: string;
   email: string;
+  studentId: string;
   clanName: string;
   wardVillage: string;
   llgName: string;
@@ -106,6 +118,7 @@ export function ApplicationWizard({
   const [documents, setDocuments] = useState(initialDocuments);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [declaration, setDeclaration] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -124,6 +137,7 @@ export function ApplicationWizard({
   const needed = requiredDocuments(values.applicantType, values.eligibilityPath);
   const have = new Set(documents.map((doc) => doc.type));
   const missing = needed.filter((type) => !have.has(type));
+  const llgs = llgsForDistrict(values.districtName);
   const groupedInstitutions = useMemo(() => {
     const groups = new Map<string, Institution[]>();
     for (const item of institutions) {
@@ -150,6 +164,7 @@ export function ApplicationWizard({
 
   function onUpload(type: string, file: File) {
     setError(null);
+    setWarning(null);
     const data = asFormData();
     data.set("type", type);
     data.set("file", file);
@@ -157,14 +172,27 @@ export function ApplicationWizard({
       await saveDraft(asFormData());
       const result = await uploadDocument(data);
       if (result && "error" in result) {
-        setError(result.error ?? "Could not upload that file.");
+        setError(result.error ?? "This document could not be verified. Please review the highlighted issue or upload the correct document.");
         return;
       }
-      setMessage(`${DOCUMENT_LABELS[type] ?? type} uploaded.`);
+      if (result && "warning" in result && result.warning) {
+        setWarning(result.warning);
+      } else {
+        setMessage(result?.message ?? `${DOCUMENT_LABELS[type] ?? type} was uploaded successfully and is awaiting screening.`);
+      }
       router.refresh();
       setDocuments((current) => {
         const without = current.filter((doc) => doc.type !== type);
-        return [...without, { id: `tmp-${type}`, type, originalName: file.name, sizeBytes: file.size }];
+        return [
+          ...without,
+          {
+            id: `tmp-${type}`,
+            type,
+            originalName: file.name,
+            sizeBytes: file.size,
+            screeningStatus: result && "status" in result ? result.status : null,
+          },
+        ];
       });
     });
   }
@@ -217,14 +245,11 @@ export function ApplicationWizard({
       </ol>
 
       {error ? (
-        <div className="rounded-lg border border-[#f1b7c0] bg-[#fde8eb] px-4 py-3 text-sm text-[#8e1528]">
-          {error}
-        </div>
+        <Alert tone="error">{error}</Alert>
       ) : null}
-      {message && !error ? (
-        <div className="rounded-lg border border-[#b7dcc6] bg-[#eef7f1] px-4 py-3 text-sm text-[var(--huef-green-dark)]">
-          {message}
-        </div>
+      {warning && !error ? <Alert tone="warning">{warning}</Alert> : null}
+      {message && !error && !warning ? (
+        <Alert tone="success">{message}</Alert>
       ) : null}
 
       <Card>
@@ -235,10 +260,10 @@ export function ApplicationWizard({
           {step === 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Given name" htmlFor="givenName" required>
-                <Input id="givenName" value={values.givenName} onChange={(e) => set("givenName", e.target.value)} className="uppercase" />
+                <Input id="givenName" value={values.givenName} onChange={(e) => set("givenName", e.target.value)} className="uppercase" placeholder="e.g. John T." />
               </Field>
               <Field label="Surname" htmlFor="surname" required>
-                <Input id="surname" value={values.surname} onChange={(e) => set("surname", e.target.value)} className="uppercase" />
+                <Input id="surname" value={values.surname} onChange={(e) => set("surname", e.target.value)} className="uppercase" placeholder="e.g. Doe" />
               </Field>
               <Field label="Gender" htmlFor="gender" required>
                 <Select id="gender" value={values.gender} onChange={(e) => set("gender", e.target.value)}>
@@ -253,11 +278,14 @@ export function ApplicationWizard({
               <Field label="Age" htmlFor="age">
                 <Input id="age" inputMode="numeric" value={values.age} onChange={(e) => set("age", e.target.value)} />
               </Field>
-              <Field label="Contact number" htmlFor="phone" required>
-                <Input id="phone" value={values.phone} onChange={(e) => set("phone", e.target.value)} />
+              <Field label="Contact number" htmlFor="phone" required hint="e.g. +675 7XX XXX XX">
+                <Input id="phone" value={values.phone} onChange={(e) => set("phone", e.target.value)} placeholder="e.g. +675 7XX XXX XX" />
               </Field>
-              <Field label="Email" htmlFor="email" hint="This is the email on your HUEF account.">
-                <Input id="email" value={values.email} disabled />
+              <Field label="Student ID" htmlFor="studentId" optional>
+                <Input id="studentId" value={values.studentId} onChange={(e) => set("studentId", e.target.value)} placeholder="Student ID Number" />
+              </Field>
+              <Field label="Email address" htmlFor="email" hint="This is the email on your HUEF account.">
+                <Input id="email" value={values.email} disabled placeholder="e.g. john.doe@example.com" />
               </Field>
             </div>
           ) : null}
@@ -271,15 +299,27 @@ export function ApplicationWizard({
                     <Input id="clanName" value={values.clanName} onChange={(e) => set("clanName", e.target.value)} className="uppercase" />
                   </Field>
                   <Field label="Ward / village" htmlFor="wardVillage" required>
-                    <Input id="wardVillage" value={values.wardVillage} onChange={(e) => set("wardVillage", e.target.value)} className="uppercase" />
-                  </Field>
-                  <Field label="LLG" htmlFor="llgName">
-                    <Input id="llgName" value={values.llgName} onChange={(e) => set("llgName", e.target.value)} className="uppercase" />
+                    <Input id="wardVillage" value={values.wardVillage} onChange={(e) => set("wardVillage", e.target.value)} className="uppercase" placeholder="Enter your ward or village" />
                   </Field>
                   <Field label="District" htmlFor="districtName" required>
-                    <Select id="districtName" value={values.districtName} onChange={(e) => set("districtName", e.target.value)}>
-                      <option value="">Select Hela district</option>
+                    <Select
+                      id="districtName"
+                      value={values.districtName}
+                      onChange={(e) => {
+                        set("districtName", e.target.value);
+                        set("llgName", "");
+                      }}
+                    >
+                      <option value="">Select your district</option>
                       {HELA_DISTRICTS.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="LLG" htmlFor="llgName" required>
+                    <Select id="llgName" value={values.llgName} onChange={(e) => set("llgName", e.target.value)}>
+                      <option value="">Select your LLG</option>
+                      {llgs.map((name) => (
                         <option key={name} value={name}>{name}</option>
                       ))}
                     </Select>
@@ -426,8 +466,13 @@ export function ApplicationWizard({
                   ))}
                 </Select>
               </Field>
-              <Field label="Programme of study" htmlFor="programName" required hint="Example: BED/1 or Bachelor of Information Systems">
-                <Input id="programName" value={values.programName} onChange={(e) => set("programName", e.target.value)} />
+              <Field label="Programme / course" htmlFor="programName" required hint="Select a common programme or type your exact course name.">
+                <Input id="programName" value={values.programName} onChange={(e) => set("programName", e.target.value)} list="huef-programs" placeholder="Select or enter your program" />
+                <datalist id="huef-programs">
+                  {COMMON_PROGRAMS.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </Field>
               <Field label="Study level" htmlFor="studyLevel">
                 <Select id="studyLevel" value={values.studyLevel} onChange={(e) => set("studyLevel", e.target.value)}>
@@ -446,15 +491,10 @@ export function ApplicationWizard({
               </Field>
               <Field label="Year of study in 2026" htmlFor="yearOfStudy" required>
                 <Select id="yearOfStudy" value={values.yearOfStudy} onChange={(e) => set("yearOfStudy", e.target.value)}>
-                  <option value="">Select</option>
-                  <option>1st year</option>
-                  <option>2nd year</option>
-                  <option>3rd year</option>
-                  <option>4th year</option>
-                  <option>5th year / final</option>
-                  <option>Grade 11</option>
-                  <option>Grade 12</option>
-                  <option>Postgraduate</option>
+                  <option value="">Select your current year</option>
+                  {YEAR_LEVELS.map((year) => (
+                    <option key={year}>{year}</option>
+                  ))}
                 </Select>
               </Field>
               <Field label="Expected completion year" htmlFor="expectedCompletion">
@@ -539,6 +579,9 @@ export function ApplicationWizard({
                         {existing ? (
                           <p className="mt-1 text-sm text-[#5c564c]">
                             {existing.originalName} · {fileSizeLabel(existing.sizeBytes)}
+                            {existing.screeningStatus
+                              ? ` · ${SCREENING_STATUS_LABELS[existing.screeningStatus as keyof typeof SCREENING_STATUS_LABELS] ?? existing.screeningStatus}`
+                              : ""}
                           </p>
                         ) : (
                           <p className="mt-1 text-sm text-[var(--huef-red)]">Not uploaded yet</p>

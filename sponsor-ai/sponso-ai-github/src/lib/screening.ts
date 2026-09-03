@@ -1,4 +1,13 @@
-import { DOCUMENT_LABELS, FEE_CATEGORY_LABELS, HELA_DISTRICTS, requiredDocuments } from "./constants";
+import {
+  DOCUMENT_LABELS,
+  FEE_CATEGORY_LABELS,
+  HELA_DISTRICTS,
+  SCREENING_STATUS_LABELS,
+  requiredDocuments,
+  type ScreeningStatus,
+} from "./constants";
+import type { DocumentScreening } from "./document-ai";
+import { worstDocumentStatus } from "./document-ai";
 import { normalizeName } from "./utils";
 
 export type ScreeningFlag = {
@@ -17,11 +26,14 @@ export type DuplicateMatch = {
 export type ScreeningResult = {
   score: number;
   recommendation: "RECOMMEND_APPROVE" | "NEEDS_REVIEW" | "RECOMMEND_REJECT";
+  overallStatus: ScreeningStatus;
   summary: string;
   flags: ScreeningFlag[];
   missingDocuments: string[];
   duplicates: DuplicateMatch[];
+  documents: Array<DocumentScreening & { type: string; originalName?: string }>;
   runAt: string;
+  version: string;
 };
 
 export type ScreenableApplication = {
@@ -41,6 +53,7 @@ export type ScreenableApplication = {
   dateOfBirth?: string | null;
   districtName?: string | null;
   documentTypes: string[];
+  documentFindings?: Array<DocumentScreening & { type: string; originalName?: string }>;
   others: Array<{
     id: string;
     givenName: string;
@@ -60,6 +73,7 @@ export function runScreening(app: ScreenableApplication): ScreeningResult {
   let score = 100;
   const required = requiredDocuments(app.applicantType, app.eligibilityPath);
   const missingDocuments = required.filter((type) => !app.documentTypes.includes(type));
+  const documentFindings = app.documentFindings ?? [];
 
   if (missingDocuments.length === 0) {
     flags.push({
@@ -235,6 +249,33 @@ export function runScreening(app: ScreenableApplication): ScreeningResult {
     });
   }
 
+  for (const finding of documentFindings) {
+    if (finding.status === "PASSED_INITIAL") {
+      flags.push({
+        severity: "pass",
+        code: `DOC_${finding.type}`,
+        title: `${DOCUMENT_LABELS[finding.type] ?? finding.type}: ${finding.title}`,
+        detail: finding.reason,
+      });
+    } else if (finding.status === "UNREADABLE_DOCUMENT" || finding.status === "INCORRECT_DOCUMENT") {
+      score -= 14;
+      flags.push({
+        severity: "fail",
+        code: `DOC_${finding.type}`,
+        title: `${DOCUMENT_LABELS[finding.type] ?? finding.type}: ${finding.title}`,
+        detail: finding.reason,
+      });
+    } else {
+      score -= 8;
+      flags.push({
+        severity: "warning",
+        code: `DOC_${finding.type}`,
+        title: `${DOCUMENT_LABELS[finding.type] ?? finding.type}: ${finding.title}`,
+        detail: finding.reason,
+      });
+    }
+  }
+
   score = clamp(score);
   const hasFail = flags.some((flag) => flag.severity === "fail");
   const recommendation: ScreeningResult["recommendation"] = hasFail
@@ -247,21 +288,41 @@ export function runScreening(app: ScreenableApplication): ScreeningResult {
         ? "RECOMMEND_APPROVE"
         : "NEEDS_REVIEW";
 
+  const docStatus = worstDocumentStatus([
+    ...(missingDocuments.length ? (["MISSING_REQUIRED"] as ScreeningStatus[]) : []),
+    ...documentFindings.map((item) => item.status),
+  ]);
+  let overallStatus: ScreeningStatus = docStatus ?? "PASSED_INITIAL";
+  if (duplicates.length && (overallStatus === "PASSED_INITIAL" || overallStatus === "UNABLE_TO_DETERMINE")) {
+    overallStatus = "POTENTIAL_DUPLICATE";
+  }
+  if (hasFail && overallStatus === "PASSED_INITIAL") {
+    overallStatus = "NEEDS_REVIEW";
+  }
+  if (recommendation === "RECOMMEND_APPROVE" && overallStatus === "PASSED_INITIAL") {
+    overallStatus = "PASSED_INITIAL";
+  } else if (recommendation === "NEEDS_REVIEW" && overallStatus === "PASSED_INITIAL") {
+    overallStatus = "NEEDS_REVIEW";
+  }
+
   const summary =
     recommendation === "RECOMMEND_APPROVE"
-      ? "The file looks complete and eligible. A human officer should still read the documents before approving."
+      ? `Preliminary result: ${SCREENING_STATUS_LABELS[overallStatus]}. The file looks complete and eligible. A human officer must still read the documents before approving.`
       : recommendation === "RECOMMEND_REJECT"
-        ? "The screening rules found a serious eligibility or completeness problem. The Coordinator should confirm before rejecting."
-        : "The file needs a person to look at it. Flags are shown below; the final decision stays with the Coordinator.";
+        ? `Preliminary result: ${SCREENING_STATUS_LABELS[overallStatus]}. The screening rules found a serious eligibility or completeness problem. The Coordinator should confirm before rejecting. AI does not make the award.`
+        : `Preliminary result: ${SCREENING_STATUS_LABELS[overallStatus]}. The file needs a person to look at it. Flags are explained below; the final decision stays with the Coordinator.`;
 
   return {
     score,
     recommendation,
+    overallStatus,
     summary,
     flags,
     missingDocuments,
     duplicates,
+    documents: documentFindings,
     runAt: new Date().toISOString(),
+    version: "HUEF AI Screening Engine v2",
   };
 }
 
@@ -274,4 +335,9 @@ export function recommendationLabel(value: ScreeningResult["recommendation"]) {
     default:
       return "Needs officer review";
   }
+}
+
+export function overallStatusLabel(value?: string | null) {
+  if (!value) return "Not screened";
+  return SCREENING_STATUS_LABELS[value as ScreeningStatus] ?? value.replaceAll("_", " ");
 }

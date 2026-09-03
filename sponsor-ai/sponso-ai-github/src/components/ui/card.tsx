@@ -66,16 +66,26 @@ export function Badge({
   );
 }
 
-export function statusTone(status: string): "gold" | "green" | "red" | "neutral" | "blue" {
+export function statusTone(status: string): "gold" | "green" | "red" | "neutral" | "blue" | "amber" {
   switch (status) {
     case "PENDING":
       return "gold";
     case "APPROVED":
+    case "PASSED_INITIAL":
       return "green";
     case "REJECTED":
+    case "INCORRECT_DOCUMENT":
+    case "UNREADABLE_DOCUMENT":
       return "red";
     case "DRAFT":
       return "blue";
+    case "MORE_INFO":
+    case "NEEDS_REVIEW":
+    case "INFORMATION_MISMATCH":
+    case "POTENTIAL_DUPLICATE":
+    case "UNABLE_TO_DETERMINE":
+    case "MISSING_REQUIRED":
+      return "amber";
     default:
       return "neutral";
   }

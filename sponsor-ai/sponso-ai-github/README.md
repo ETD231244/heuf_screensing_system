@@ -1,22 +1,19 @@
 # HUEF Online Application Screening and Management System
 
-A web portal for the **Hela Undialu Education Foundation** (Hela Provincial Government) so students can lodge 2026 Tuition Fee Assistance applications online, and the Sponsorship Coordinator can screen, sort, and decide them in one place.
+A web portal for the **Hela Undialu Education Foundation** (Hela Provincial Government) so students can lodge 2026 Tuition Fee Assistance applications online, and Coordinators and Administrators can screen, decide, notify, and report in one place.
 
-It replaces the current mix of email, hand delivery, and folders with:
+Workflow:
 
-- a student account and the official 2026 application form
-- required document uploads (blocked from submitting if a file is missing)
-- a coordinator dashboard filterable by district, institution, and status
-- a screening assistant that checks completeness, Hela/public-servant eligibility, corporate double-dipping, and possible duplicates
-- a student status page so applicants do not have to phone Tari to ask whether a file arrived
+**Account Registration → Applicant Profile → HUEF Application → Document Upload → AI Preliminary Screening → Coordinator Review → Decision/Status Update → Applicant Notification → Reporting & Audit**
 
-The final award always stays with the human Coordinator.
+The AI engine is assistive only. Authorised HUEF officials make the final verification and award decision.
 
 ## Run locally
 
 You need Node.js 20+.
 
 ```bash
+cp .env.example .env
 npm install
 npx prisma db push
 npm run db:seed
@@ -29,57 +26,59 @@ Open [http://localhost:43127](http://localhost:43127).
 
 | Role | Email | Password |
 | --- | --- | --- |
+| Administrator | admin@huef.pg | HUEF2026! |
 | Coordinator | coordinator@huef.pg | HUEF2026! |
 | Student (draft form) | student@huef.pg | student123 |
 | Other seeded students | e.g. henene.agibe@student.pg | student123 |
 
-Copy `.env.example` to `.env` if you are not using the values already in the repo’s local setup.
+`AUTH_SECRET` signs login cookies. `DATABASE_URL` points at a local SQLite file (`prisma/dev.db`). Uploaded documents are stored under `storage/documents/` and in the database.
 
-`AUTH_SECRET` signs login cookies. `DATABASE_URL` points at a local SQLite file (`prisma/dev.db`). Uploaded documents are stored under `storage/documents/`.
+### Google sign-in
 
-## What students can do
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and add the callback URL `{origin}/auth/google/callback` in the Google Cloud console. Email/password sign-in remains available. If a Google email already belongs to a HUEF account, the existing account is used (no duplicate). New Google users must still complete HUEF-specific profile fields.
 
-1. Register and sign in.
-2. Complete the 2026 form (personal details, origin, eligibility, education, fees, declaration).
-3. Upload the documents required for a new intake or a continuing student.
-4. Submit only when the form and files are complete.
-5. Sign back in later and see Pending, Approved, or Not successful.
+## What applicants can do
 
-## What the Coordinator can do
+1. Register with realistic HUEF fields, or continue with Google.
+2. Upload a profile photograph and complete origin details (District → LLG).
+3. Fill the 2026 form and upload required documents.
+4. See application completion, missing documents, and screening issues on the dashboard.
+5. Receive notices about submission, missing files, AI flags, coordinator requests, decisions, and announcements.
 
-1. See every submitted application in one list.
-2. Filter by Hela district, nominated institution, and status.
-3. Open a file, read the attached PDFs/photos, and view district counts.
-4. Use the screening assistant as a first pass — then Approve, Reject, or keep Pending, with an optional note the student can read.
+## What Coordinators can do
+
+1. Work from a screening desk: totals, AI-flagged files, incomplete files, and manual review.
+2. Filter by institution, district, LLG, year level, status, and screening result.
+3. Open an applicant with profile photo, form data, documents, AI findings, and screening history together.
+4. Override an AI recommendation with a recorded reason, request more information, approve, or reject.
+5. Send notices to one applicant, a district, pending applicants, or all applicants.
+6. Export reports (CSV) by institution, district, LLG, programme, year, status, and screening outcome.
+
+## What Administrators can do
+
+Manage users and roles, institutions, programmes, districts and LLGs, application periods, required document types, announcements, system settings, reports, and the audit trail.
 
 ## Stack
 
 Next.js (App Router), TypeScript, Tailwind CSS, Prisma. Local Preview uses SQLite. Production is meant to use **PostgreSQL** (Neon or Supabase). Uploaded documents are stored in the database so Vercel does not need a separate file server.
 
-Firebase Firestore is not used: it would mean rewriting the data layer. Postgres is the same SQL style Prisma already uses.
+## Deploy
 
-## Deploy (easiest path)
-
-1. Create a free Postgres database at [Neon](https://neon.tech) (or Supabase). Copy the connection string.
-2. Click **Publish** in Cursor to deploy to Vercel, or import the GitHub/Origin repo in Vercel.
-3. In Vercel → Settings → Environment Variables, set:
+1. Create a Postgres database (Neon or Supabase). Copy the connection string.
+2. Deploy to Vercel and set:
 
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
 AUTH_SECRET=a-long-random-string
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 ```
 
-4. Redeploy. Then, once, against that same `DATABASE_URL`:
+3. Against that same `DATABASE_URL`:
 
 ```bash
 npx prisma db push
 npm run db:seed
 ```
 
-Change the demo coordinator password before real students use the site.
-
-## Production notes
-
-- HTTPS comes with Vercel.
-- Do not use the SQLite file (`file:./dev.db`) on Vercel — it will be empty after each deploy.
-- The screening score is a recommendation only. The Coordinator still decides.
+Change demo passwords before real students use the site. The screening score is a recommendation only.

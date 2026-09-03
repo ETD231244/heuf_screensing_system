@@ -3,13 +3,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { RegisterForm } from "@/components/auth-forms";
-import { getSession } from "@/lib/auth";
+import { getSession, homeForRole } from "@/lib/auth";
 import { FLASH_COOKIE } from "@/lib/constants";
 
 export default async function RegisterPage() {
   const session = await getSession();
-  if (session?.role === "COORDINATOR") redirect("/coordinator");
-  if (session) redirect("/student");
+  if (session) redirect(homeForRole(session.role));
   const flash = (await cookies()).get(FLASH_COOKIE)?.value;
 
   return (

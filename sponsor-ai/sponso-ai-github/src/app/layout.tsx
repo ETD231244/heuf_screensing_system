@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth";
+import { unreadNotificationCount } from "@/lib/notify";
 import { SiteFooter, SiteHeader } from "@/components/layout/chrome";
 import "./globals.css";
 
@@ -9,12 +11,17 @@ export const metadata: Metadata = {
     "Apply online for Hela Undialu Education Foundation tuition fee assistance and track your application status.",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const user = await getSession();
+  const unread = user ? await unreadNotificationCount(user.id) : 0;
   return (
     <html lang="en">
       <body className="flex min-h-full flex-col antialiased">
-        <SiteHeader user={user} />
+        <SiteHeader user={user} unreadCount={unread} />
         <main className="flex-1">{children}</main>
         <SiteFooter />
       </body>

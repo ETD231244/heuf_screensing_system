@@ -2,8 +2,9 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { mkdir, copyFile, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
-import { HELA_DISTRICTS, INSTITUTIONS } from "../src/lib/constants";
-import { runScreening } from "../src/lib/screening";
+import { DOCUMENT_LABELS, HELA_DISTRICTS, INSTITUTIONS } from "../src/lib/constants";
+import { DISTRICT_LLGS } from "../src/lib/geo";
+import { screenApplication } from "../src/lib/screen-application";
 
 const prisma = new PrismaClient();
 
@@ -43,17 +44,33 @@ async function addDocument(applicationId: string, type: string, name: string) {
 }
 
 async function main() {
+  await prisma.notification.deleteMany();
+  await prisma.auditLog.deleteMany();
+  await prisma.screeningHistory.deleteMany();
   await prisma.document.deleteMany();
   await prisma.application.deleteMany();
   await prisma.applicant.deleteMany();
+  await prisma.announcement.deleteMany();
+  await prisma.systemSetting.deleteMany();
+  await prisma.documentType.deleteMany();
+  await prisma.applicationPeriod.deleteMany();
+  await prisma.program.deleteMany();
   await prisma.user.deleteMany();
   await prisma.institution.deleteMany();
+  await prisma.llg.deleteMany();
   await prisma.district.deleteMany();
 
   const districts = await Promise.all(
     HELA_DISTRICTS.map((name) => prisma.district.create({ data: { name } })),
   );
   const districtByName = Object.fromEntries(districts.map((d) => [d.name, d]));
+  const llgByKey: Record<string, { id: string; name: string }> = {};
+  for (const district of districts) {
+    for (const llgName of DISTRICT_LLGS[district.name as keyof typeof DISTRICT_LLGS]) {
+      const llg = await prisma.llg.create({ data: { name: llgName, districtId: district.id } });
+      llgByKey[`${district.name}:${llgName}`] = llg;
+    }
+  }
 
   const institutions = await Promise.all(
     INSTITUTIONS.map((item) =>
@@ -64,14 +81,73 @@ async function main() {
   );
   const inst = Object.fromEntries(institutions.map((i) => [i.code, i]));
 
+  await prisma.program.createMany({
+    data: [
+      { name: "Bachelor of Information Systems", institutionId: inst.A5.id },
+      { name: "Bachelor of Education", institutionId: inst.A2.id },
+      { name: "Bachelor of Science", institutionId: inst.A1.id },
+      { name: "Diploma of Primary Teaching", institutionId: inst.B1.id },
+    ],
+  });
+
+  for (const [code, label, neu, cont, nonHela] of [
+    ["PASSPORT_PHOTO", DOCUMENT_LABELS.PASSPORT_PHOTO, true, true, false],
+    ["ACCEPTANCE_LETTER", DOCUMENT_LABELS.ACCEPTANCE_LETTER, true, false, false],
+    ["GRADE_10", DOCUMENT_LABELS.GRADE_10, true, false, false],
+    ["GRADE_12", DOCUMENT_LABELS.GRADE_12, true, false, false],
+    ["FEE_STRUCTURE", DOCUMENT_LABELS.FEE_STRUCTURE, true, true, false],
+    ["CONFIRMATION_LETTER", DOCUMENT_LABELS.CONFIRMATION_LETTER, false, true, false],
+    ["TRANSCRIPT", DOCUMENT_LABELS.TRANSCRIPT, false, true, false],
+    ["STUDENT_ID", DOCUMENT_LABELS.STUDENT_ID, false, true, false],
+    ["SUPPORT_LETTER", DOCUMENT_LABELS.SUPPORT_LETTER, false, false, true],
+  ] as const) {
+    await prisma.documentType.create({
+      data: {
+        code,
+        label,
+        requiredForNew: Boolean(neu),
+        requiredForContinuing: Boolean(cont),
+        requiredForNonHela: Boolean(nonHela),
+      },
+    });
+  }
+
+  await prisma.applicationPeriod.create({
+    data: {
+      academicYear: "2026",
+      title: "2026 HUEF Tuition Fee Assistance",
+      opensAt: new Date("2025-11-01T00:00:00"),
+      closesAt: new Date("2026-02-13T16:00:00"),
+    },
+  });
+
+  await prisma.systemSetting.createMany({
+    data: [
+      { key: "support_phone", value: "7412 2491" },
+      { key: "support_email", value: "huefsponsorship@gmail.com" },
+      { key: "deadline_label", value: "Friday 13 February 2026" },
+      { key: "office_hours", value: "Monday–Friday, 8:00am–4:00pm" },
+    ],
+  });
+
   const password = await bcrypt.hash("HUEF2026!", 10);
   const studentPassword = await bcrypt.hash("student123", 10);
+
+  await prisma.user.create({
+    data: {
+      email: "admin@huef.pg",
+      passwordHash: password,
+      role: "ADMIN",
+      authProvider: "PASSWORD",
+    },
+  });
 
   await prisma.user.create({
     data: {
       email: "coordinator@huef.pg",
       passwordHash: password,
       role: "COORDINATOR",
+      authProvider: "PASSWORD",
     },
   });
 
@@ -91,6 +167,7 @@ async function main() {
           clanName: "HULI",
           wardVillage: "HOBURA",
           llgName: "TARI URBAN",
+          llgId: llgByKey["Tari-Pori:Tari Urban"]?.id,
           districtId: districtByName["Tari-Pori"].id,
           province: "Hela",
           fatherFullName: "JOSEPH PUNDARI",
@@ -329,7 +406,8 @@ async function main() {
             phone: sample.phone,
             clanName: sample.clan,
             wardVillage: sample.village,
-            llgName: `${sample.district.toUpperCase()} LLG`,
+            llgName: DISTRICT_LLGS[sample.district as keyof typeof DISTRICT_LLGS]?.[0] ?? sample.district,
+            llgId: llgByKey[`${sample.district}:${DISTRICT_LLGS[sample.district as keyof typeof DISTRICT_LLGS]?.[0]}`]?.id,
             districtId: districtByName[sample.district].id,
             province: "Hela",
             fatherFullName: `FATHER OF ${sample.givenName}`,
@@ -415,53 +493,48 @@ async function main() {
       }
     }
 
-    const withDocs = await prisma.application.findUnique({
-      where: { id: application.id },
-      include: {
-        documents: true,
-        applicant: { include: { user: true, district: true } },
+    await screenApplication(application.id, "SYSTEM");
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        applicationId: application.id,
+        title: sample.status === "APPROVED" ? "Application approved" : sample.status === "REJECTED" ? "Application not successful" : "Application received",
+        message:
+          sample.status === "APPROVED"
+            ? "Your HUEF application has been approved."
+            : sample.status === "REJECTED"
+              ? sample.note || "Your HUEF application was not successful."
+              : "Your HUEF application is with the Sponsorship Coordinator for review.",
+        type: sample.status === "APPROVED" ? "SUCCESS" : sample.status === "REJECTED" ? "ERROR" : "INFO",
+        category: "APPLICATION",
       },
-    });
-    if (!withDocs) continue;
-
-    const others = samples
-      .filter((item) => item.email !== sample.email)
-      .map((item) => ({
-        id: item.email,
-        givenName: item.givenName,
-        surname: item.surname,
-        phone: item.phone,
-        email: item.email,
-        dateOfBirth: item.dob,
-      }));
-
-    const screening = runScreening({
-      id: withDocs.id,
-      applicantType: withDocs.applicantType,
-      eligibilityPath: withDocs.applicant.eligibilityPath,
-      feeCategory: withDocs.feeCategory,
-      publicServantYears: withDocs.applicant.publicServantYears,
-      programName: withDocs.programName,
-      yearOfStudy: withDocs.yearOfStudy,
-      witnessName: withDocs.witnessName,
-      tuitionFees: withDocs.tuitionFees,
-      givenName: withDocs.applicant.givenName,
-      surname: withDocs.applicant.surname,
-      phone: withDocs.applicant.phone,
-      email: withDocs.applicant.user.email,
-      dateOfBirth: withDocs.applicant.dateOfBirth,
-      districtName: withDocs.applicant.district?.name,
-      documentTypes: withDocs.documents.map((d) => d.type),
-      others,
-    });
-
-    await prisma.application.update({
-      where: { id: application.id },
-      data: { screeningJson: JSON.stringify(screening) },
     });
   }
 
+  const admin = await prisma.user.findUnique({ where: { email: "admin@huef.pg" } });
+  await prisma.announcement.create({
+    data: {
+      title: "2026 TFA closing date",
+      body: "Lodge your complete 2026 HUEF Tuition Fee Assistance application, with all required documents, by Friday 13 February 2026.",
+      audience: "STUDENT",
+      deadlineAt: new Date("2026-02-13T16:00:00"),
+      createdById: admin?.id,
+    },
+  });
+  const students = await prisma.user.findMany({ where: { role: "STUDENT" } });
+  await prisma.notification.createMany({
+    data: students.map((item) => ({
+      userId: item.id,
+      senderId: admin?.id,
+      title: "2026 TFA closing date",
+      message: "Lodge your complete 2026 HUEF application, with all required documents, by Friday 13 February 2026.",
+      type: "ANNOUNCEMENT",
+      category: "ANNOUNCEMENT",
+    })),
+  });
+
   console.log("Seeded HUEF demo data.");
+  console.log("Admin: admin@huef.pg / HUEF2026!");
   console.log("Coordinator: coordinator@huef.pg / HUEF2026!");
   console.log("Student (draft): student@huef.pg / student123");
 }

@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, signedSessionToken } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
+import { notifyUser } from "@/lib/notify";
 import { redirectRelative, signedInPage } from "@/lib/session-response";
+import { originLooksTrusted } from "@/lib/security";
 
 const registerSchema = z.object({
   givenName: z.string().trim().min(2),
@@ -13,6 +16,10 @@ const registerSchema = z.object({
 });
 
 export async function handleRegister(request: Request) {
+  if (!originLooksTrusted(request)) {
+    return redirectRelative(request, "/register", { flash: "invalid" });
+  }
+
   const form = await request.formData();
   const parsed = registerSchema.safeParse({
     givenName: form.get("givenName"),
@@ -40,7 +47,9 @@ export async function handleRegister(request: Request) {
     data: {
       email,
       passwordHash: await hashPassword(parsed.data.password),
+      authProvider: "PASSWORD",
       role: "STUDENT",
+      lastLoginAt: new Date(),
       applicant: {
         create: {
           givenName: parsed.data.givenName.trim().toUpperCase(),
@@ -53,6 +62,23 @@ export async function handleRegister(request: Request) {
     include: { applicant: true },
   });
 
+  await recordAudit({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "REGISTER",
+    entityType: "User",
+    entityId: user.id,
+    details: "Applicant account created with email and password",
+  });
+  await notifyUser({
+    userId: user.id,
+    title: "Welcome to HUEF",
+    message:
+      "Your HUEF account has been created successfully. Complete your profile, then start your 2026 Tuition Fee Assistance application.",
+    type: "SUCCESS",
+    category: "APPLICATION",
+  });
+
   const token = await signedSessionToken({
     id: user.id,
     email: user.email,
@@ -61,5 +87,5 @@ export async function handleRegister(request: Request) {
     surname: user.applicant?.surname,
   });
 
-  return signedInPage(request, "/student/apply", token);
+  return signedInPage(request, "/student/profile?welcome=1", token);
 }

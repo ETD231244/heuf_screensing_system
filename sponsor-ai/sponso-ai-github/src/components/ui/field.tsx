@@ -52,12 +52,16 @@ export function Field({
   label,
   htmlFor,
   hint,
+  error,
+  optional,
   required,
   children,
 }: {
   label: string;
   htmlFor?: string;
   hint?: string;
+  error?: string;
+  optional?: boolean;
   required?: boolean;
   children: React.ReactNode;
 }) {
@@ -66,9 +70,11 @@ export function Field({
       <Label htmlFor={htmlFor}>
         {label}
         {required ? <span className="ml-1 text-[var(--huef-red)]">*</span> : null}
+        {optional ? <span className="ml-1 text-xs font-medium text-[#7a7266]">(optional)</span> : null}
       </Label>
       {children}
-      {hint ? <p className="mt-1 text-xs text-[#6f675c]">{hint}</p> : null}
+      {error ? <p className="mt-1 text-xs font-medium text-[var(--huef-red)]">{error}</p> : null}
+      {hint && !error ? <p className="mt-1 text-xs text-[#6f675c]">{hint}</p> : null}
     </div>
   );
 }

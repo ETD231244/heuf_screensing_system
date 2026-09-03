@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { SESSION_COOKIE } from "./constants";
 
+export type UserRole = "STUDENT" | "COORDINATOR" | "ADMIN";
+
 export type SessionUser = {
   id: string;
   email: string;
-  role: "STUDENT" | "COORDINATOR";
+  role: UserRole;
   givenName?: string;
   surname?: string;
 };
@@ -21,8 +23,21 @@ export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
 }
 
-export async function verifyPassword(password: string, hash: string) {
+export async function verifyPassword(password: string, hash: string | null | undefined) {
+  if (!hash) return false;
   return bcrypt.compare(password, hash);
+}
+
+export function normalizeRole(role?: string | null): UserRole {
+  if (role === "ADMIN") return "ADMIN";
+  if (role === "COORDINATOR") return "COORDINATOR";
+  return "STUDENT";
+}
+
+export function homeForRole(role: UserRole) {
+  if (role === "ADMIN") return "/admin";
+  if (role === "COORDINATOR") return "/coordinator";
+  return "/student";
 }
 
 export const sessionCookieOptions = {
@@ -78,7 +93,7 @@ export async function getSession(): Promise<SessionUser | null> {
     return {
       id: String(payload.id),
       email: String(payload.email),
-      role: payload.role === "COORDINATOR" ? "COORDINATOR" : "STUDENT",
+      role: normalizeRole(String(payload.role)),
       givenName: payload.givenName ? String(payload.givenName) : undefined,
       surname: payload.surname ? String(payload.surname) : undefined,
     };
@@ -95,12 +110,26 @@ export async function requireUser() {
 
 export async function requireStudent() {
   const session = await requireUser();
-  if (session.role !== "STUDENT") redirect("/coordinator");
+  if (session.role !== "STUDENT") redirect(homeForRole(session.role));
   return session;
 }
 
 export async function requireCoordinator() {
   const session = await requireUser();
-  if (session.role !== "COORDINATOR") redirect("/student");
+  if (session.role !== "COORDINATOR" && session.role !== "ADMIN") {
+    redirect(homeForRole(session.role));
+  }
+  return session;
+}
+
+export async function requireAdmin() {
+  const session = await requireUser();
+  if (session.role !== "ADMIN") redirect(homeForRole(session.role));
+  return session;
+}
+
+export async function requireStaff() {
+  const session = await requireUser();
+  if (session.role === "STUDENT") redirect("/student");
   return session;
 }

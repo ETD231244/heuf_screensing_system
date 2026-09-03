@@ -1,7 +1,12 @@
+export { DISTRICT_LLGS, HELA_DISTRICTS, llgsForDistrict, type HelaDistrict } from "./geo";
+
 export const ACADEMIC_YEAR = "2026";
 export const SESSION_COOKIE = "huef_session";
 export const FLASH_COOKIE = "huef_flash";
+export const GOOGLE_STATE_COOKIE = "huef_google_oauth";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+export const APPLICATION_DEADLINE_LABEL = "Friday 13 February 2026";
 
 export const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -10,12 +15,59 @@ export const ALLOWED_MIME_TYPES = [
   "image/webp",
 ] as const;
 
-export const HELA_DISTRICTS = [
-  "Tari-Pori",
-  "Komo-Hulia",
-  "Koroba-Lake Kopiago",
-  "Magarima",
+export const ALLOWED_PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+export const YEAR_LEVELS = [
+  "1st year",
+  "2nd year",
+  "3rd year",
+  "4th year",
+  "5th year / final",
+  "Grade 11",
+  "Grade 12",
+  "Postgraduate",
 ] as const;
+
+export const COMMON_PROGRAMS = [
+  "Bachelor of Education",
+  "Bachelor of Information Systems",
+  "Bachelor of Science",
+  "Bachelor of Arts",
+  "Bachelor of Business",
+  "Bachelor of Engineering (Civil)",
+  "Bachelor of Nursing",
+  "Diploma of Primary Teaching",
+  "Certificate in Community Health Work",
+  "Grade 11",
+  "Grade 12",
+  "Other / not listed",
+] as const;
+
+export const USER_ROLES = ["STUDENT", "COORDINATOR", "ADMIN"] as const;
+
+export const SCREENING_STATUSES = [
+  "PASSED_INITIAL",
+  "NEEDS_REVIEW",
+  "INFORMATION_MISMATCH",
+  "INCORRECT_DOCUMENT",
+  "UNREADABLE_DOCUMENT",
+  "MISSING_REQUIRED",
+  "POTENTIAL_DUPLICATE",
+  "UNABLE_TO_DETERMINE",
+] as const;
+
+export type ScreeningStatus = (typeof SCREENING_STATUSES)[number];
+
+export const SCREENING_STATUS_LABELS: Record<ScreeningStatus, string> = {
+  PASSED_INITIAL: "Passed Initial Screening",
+  NEEDS_REVIEW: "Needs Review",
+  INFORMATION_MISMATCH: "Information Mismatch",
+  INCORRECT_DOCUMENT: "Incorrect Document",
+  UNREADABLE_DOCUMENT: "Unreadable Document",
+  MISSING_REQUIRED: "Missing Required Document",
+  POTENTIAL_DUPLICATE: "Potential Duplicate",
+  UNABLE_TO_DETERMINE: "AI Unable to Determine",
+};
 
 export const PNG_PROVINCES = [
   "Hela",
@@ -46,8 +98,15 @@ export const PNG_PROVINCES = [
 export const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
   PENDING: "Pending review",
+  MORE_INFO: "More information requested",
   APPROVED: "Approved",
   REJECTED: "Not successful",
+};
+
+export const ROLE_LABELS: Record<string, string> = {
+  STUDENT: "Applicant",
+  COORDINATOR: "Coordinator",
+  ADMIN: "Administrator",
 };
 
 export const ELIGIBILITY_LABELS: Record<string, string> = {

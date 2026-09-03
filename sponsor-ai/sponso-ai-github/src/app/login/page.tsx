@@ -3,13 +3,12 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "@/components/auth-forms";
-import { getSession } from "@/lib/auth";
+import { getSession, homeForRole } from "@/lib/auth";
 import { FLASH_COOKIE } from "@/lib/constants";
 
 export default async function LoginPage() {
   const session = await getSession();
-  if (session?.role === "COORDINATOR") redirect("/coordinator");
-  if (session) redirect("/student");
+  if (session) redirect(homeForRole(session.role));
   const flash = (await cookies()).get(FLASH_COOKIE)?.value;
 
   return (
@@ -33,6 +32,9 @@ export default async function LoginPage() {
             <p className="font-semibold text-[var(--huef-green-dark)]">Demo accounts</p>
             <p className="mt-1 text-[#5c564c]">
               Coordinator: <span className="font-mono">coordinator@huef.pg</span> / HUEF2026!
+            </p>
+            <p className="text-[#5c564c]">
+              Administrator: <span className="font-mono">admin@huef.pg</span> / HUEF2026!
             </p>
             <p className="text-[#5c564c]">
               Student (draft form): <span className="font-mono">student@huef.pg</span> / student123

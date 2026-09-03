@@ -8,9 +8,21 @@ datasource db {
 }
 
 model District {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  llgs         Llg[]
+  applicants   Applicant[]
+  applications Application[]
+}
+
+model Llg {
   id         String      @id @default(cuid())
-  name       String      @unique
+  name       String
+  districtId String
+  district   District    @relation(fields: [districtId], references: [id], onDelete: Cascade)
   applicants Applicant[]
+
+  @@unique([districtId, name])
 }
 
 model Institution {
@@ -18,16 +30,37 @@ model Institution {
   code         String        @unique
   name         String
   category     String
+  province     String?
+  isActive     Boolean       @default(true)
+  programs     Program[]
   applications Application[]
 }
 
+model Program {
+  id            String       @id @default(cuid())
+  name          String
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  isActive      Boolean      @default(true)
+
+  @@index([name])
+}
+
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  passwordHash String
-  role         String     @default("STUDENT")
-  createdAt    DateTime   @default(now())
-  applicant    Applicant?
+  id              String             @id @default(cuid())
+  email           String             @unique
+  passwordHash    String?
+  googleId        String?            @unique
+  authProvider    String             @default("PASSWORD")
+  role            String             @default("STUDENT")
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  lastLoginAt     DateTime?
+  applicant       Applicant?
+  notifications   Notification[]     @relation("UserNotifications")
+  sentNotices     Notification[]     @relation("SentNotifications")
+  auditLogs       AuditLog[]
+  announcements   Announcement[]
 }
 
 model Applicant {
@@ -39,10 +72,13 @@ model Applicant {
   dateOfBirth                  String?
   age                          Int?
   phone                        String
-  photoPath                    String?
+  studentId                    String?
+  photoMime                    String?
+  photoBytes                   Bytes?
   clanName                     String?
   wardVillage                  String?
   llgName                      String?
+  llgId                        String?
   districtId                   String?
   province                     String?       @default("Hela")
   fatherFullName               String?
@@ -73,15 +109,16 @@ model Applicant {
   parentOriginDistrict         String?
   parentOriginProvince         String?
   district                     District?     @relation(fields: [districtId], references: [id])
+  llg                          Llg?          @relation(fields: [llgId], references: [id])
   user                         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   applications                 Application[]
 }
 
 model Application {
-  id                  String      @id @default(cuid())
+  id                  String              @id @default(cuid())
   applicantId         String
   institutionId       String
-  academicYear        String      @default("2026")
+  academicYear        String              @default("2026")
   programName         String
   studyType           String?
   studyLevel          String
@@ -106,33 +143,134 @@ model Application {
   witnessDistrict     String?
   witnessPhone        String?
   declaredAt          DateTime?
-  status              String      @default("DRAFT")
+  status              String              @default("DRAFT")
   statusNote          String?
   submittedAt         DateTime?
   decidedAt           DateTime?
   decidedByEmail      String?
   screeningJson       String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
-  institution         Institution @relation(fields: [institutionId], references: [id])
-  applicant           Applicant   @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  screeningStatus     String?
+  infoRequestedAt     DateTime?
+  infoRequestNote     String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  institution         Institution         @relation(fields: [institutionId], references: [id])
+  applicant           Applicant           @relation(fields: [applicantId], references: [id], onDelete: Cascade)
   documents           Document[]
+  screeningHistory    ScreeningHistory[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  districtId          String?
+  district            District?           @relation(fields: [districtId], references: [id])
 
   @@index([status])
   @@index([academicYear])
+  @@index([screeningStatus])
 }
 
 model Document {
-  id            String      @id @default(cuid())
-  applicationId String
-  type          String
-  originalName  String
-  storedPath    String      @default("")
-  mimeType      String
-  sizeBytes     Int
-  contents      Bytes?
-  uploadedAt    DateTime    @default(now())
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  id              String      @id @default(cuid())
+  applicationId   String
+  type            String
+  originalName    String
+  storedPath      String      @default("")
+  mimeType        String
+  sizeBytes       Int
+  contents        Bytes?
+  sha256          String?
+  screeningStatus String?
+  screeningJson   String?
+  extractedText   String?
+  pageEstimate    Int?
+  uploadedAt      DateTime    @default(now())
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@unique([applicationId, type])
+  @@index([sha256])
+}
+
+model ScreeningHistory {
+  id                   String      @id @default(cuid())
+  applicationId        String
+  resultJson           String
+  overallStatus        String
+  runBy                String      @default("SYSTEM")
+  coordinatorOverride  String?
+  overrideReason       String?
+  createdAt            DateTime    @default(now())
+  application          Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model Notification {
+  id            String       @id @default(cuid())
+  userId        String
+  senderId      String?
+  applicationId String?
+  title         String
+  message       String
+  type          String       @default("INFO")
+  category      String       @default("APPLICATION")
+  readAt        DateTime?
+  createdAt     DateTime     @default(now())
+  user          User         @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  sender        User?        @relation("SentNotifications", fields: [senderId], references: [id], onDelete: SetNull)
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  audience    String    @default("ALL")
+  published   Boolean   @default(true)
+  deadlineAt  DateTime?
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+}
+
+model AuditLog {
+  id            String       @id @default(cuid())
+  actorId       String?
+  actorEmail    String
+  action        String
+  entityType    String
+  entityId      String?
+  applicationId String?
+  details       String?
+  createdAt     DateTime     @default(now())
+  actor         User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model ApplicationPeriod {
+  id           String    @id @default(cuid())
+  academicYear String    @unique
+  title        String
+  opensAt      DateTime
+  closesAt     DateTime
+  isActive     Boolean   @default(true)
+}
+
+model DocumentType {
+  id                     String  @id @default(cuid())
+  code                   String  @unique
+  label                  String
+  requiredForNew         Boolean @default(false)
+  requiredForContinuing  Boolean @default(false)
+  requiredForNonHela     Boolean @default(false)
+  isActive               Boolean @default(true)
+}
+
+model SystemSetting {
+  key   String @id
+  value String
 }

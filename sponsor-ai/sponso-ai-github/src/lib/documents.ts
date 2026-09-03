@@ -1,6 +1,8 @@
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
+import { extractPdfText, estimatePdfPages } from "@/lib/document-ai";
+import { detectFileKind, sha256Hex } from "@/lib/security";
 
 export async function saveDocumentFile(options: {
   applicationId: string;
@@ -24,6 +26,10 @@ export async function saveDocumentFile(options: {
   }
 
   const payload = Uint8Array.from(bytes);
+  const kind = detectFileKind(bytes);
+  const extractedText = kind === "pdf" ? extractPdfText(bytes) : "";
+  const pageEstimate = kind === "pdf" ? estimatePdfPages(bytes) : null;
+  const sha256 = sha256Hex(bytes);
   await prisma.document.upsert({
     where: { applicationId_type: { applicationId, type } },
     update: {
@@ -32,6 +38,11 @@ export async function saveDocumentFile(options: {
       mimeType,
       sizeBytes: bytes.length,
       contents: payload,
+      sha256,
+      extractedText: extractedText || null,
+      pageEstimate,
+      screeningStatus: null,
+      screeningJson: null,
     },
     create: {
       applicationId,
@@ -41,6 +52,9 @@ export async function saveDocumentFile(options: {
       mimeType,
       sizeBytes: bytes.length,
       contents: payload,
+      sha256,
+      extractedText: extractedText || null,
+      pageEstimate,
     },
   });
 }

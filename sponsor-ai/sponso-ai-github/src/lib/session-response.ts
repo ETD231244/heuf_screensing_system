@@ -30,9 +30,17 @@ export function flashCookieOptionsFor(request: Request) {
   };
 }
 
+export function publicOrigin(request: Request) {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "localhost:43127";
+  const proto = isPreviewHttps(request) ? "https" : (request.headers.get("x-forwarded-proto") ?? "http");
+  return `${proto}://${host}`;
+}
+
 export function safeNextPath(path: string) {
-  const allowed = new Set(["/coordinator", "/student", "/student/apply", "/", "/login", "/register"]);
-  return allowed.has(path) ? path : "/";
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\") || path.includes("://")) {
+    return "/";
+  }
+  return path;
 }
 
 /** 200 HTML + Set-Cookie. 303 redirects drop cookies in the Cursor Desktop iframe. */
@@ -42,6 +50,7 @@ export function signedInPage(request: Request, path: string, token: string) {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="refresh" content="0;url=${next}" />
   <title>Signing in — HUEF</title>
 </head>

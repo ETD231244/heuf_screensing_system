@@ -4,12 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { requireCoordinator } from "@/lib/auth";
 import { Badge, Card, CardBody, CardHeader, CardTitle, statusTone } from "@/components/ui/card";
 import { DecisionForm, ScreeningPanel } from "@/components/coordinator-panels";
+import { Alert } from "@/components/ui/alert";
+import { Avatar } from "@/components/ui/avatar";
 import {
   DOCUMENT_LABELS,
   ELIGIBILITY_LABELS,
   FEE_CATEGORY_LABELS,
+  SCREENING_STATUS_LABELS,
   STATUS_LABELS,
   STUDY_LEVEL_LABELS,
+  type ScreeningStatus,
 } from "@/lib/constants";
 import { fileSizeLabel, formatDateTime, fullName } from "@/lib/utils";
 import { parseScreening } from "@/lib/types";
@@ -26,12 +30,14 @@ export default async function ApplicationDetailPage({
     include: {
       documents: { orderBy: { type: "asc" } },
       institution: true,
-      applicant: { include: { user: true, district: true } },
+      screeningHistory: { orderBy: { createdAt: "desc" }, take: 8 },
+      applicant: { include: { user: true, district: true, llg: true } },
     },
   });
   if (!application || application.status === "DRAFT") notFound();
   const a = application.applicant;
   const screening = parseScreening(application.screeningJson);
+  const name = fullName(a.givenName, a.surname);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
@@ -40,31 +46,48 @@ export default async function ApplicationDetailPage({
           ← All applications
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-extrabold text-[var(--huef-green-dark)]">
-              {fullName(a.givenName, a.surname)}
-            </h1>
-            <p className="text-[#5c564c]">
-              {a.user.email} · {a.phone} · {application.institution.code} {application.institution.name}
-            </p>
+          <div className="flex items-start gap-4">
+            <Avatar userId={a.userId} name={name} hasPhoto={Boolean(a.photoMime)} size={72} />
+            <div>
+              <h1 className="text-3xl font-extrabold text-[var(--huef-green-dark)]">{name}</h1>
+              <p className="text-[#5c564c]">
+                {a.user.email} · {a.phone} · {application.institution.code} {application.institution.name}
+              </p>
+              <p className="text-sm text-[#6f675c]">
+                {a.district?.name ?? "District not recorded"}
+                {a.llg?.name || a.llgName ? ` · ${a.llg?.name ?? a.llgName}` : ""}
+                {a.studentId ? ` · Student ID ${a.studentId}` : ""}
+              </p>
+            </div>
           </div>
-          <Badge tone={statusTone(application.status)} className="text-sm">
-            {STATUS_LABELS[application.status]}
-          </Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge tone={statusTone(application.status)} className="text-sm">
+              {STATUS_LABELS[application.status]}
+            </Badge>
+            {application.screeningStatus ? (
+              <Badge tone={statusTone(application.screeningStatus)}>
+                {SCREENING_STATUS_LABELS[application.screeningStatus as ScreeningStatus]}
+              </Badge>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      <Alert tone="info">
+        Open the applicant profile, uploaded documents, AI findings, and screening history together on this page. The AI recommendation is assistive only.
+      </Alert>
 
       <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-5">
           <Card>
             <CardHeader>
-              <CardTitle>Applicant</CardTitle>
+              <CardTitle>Applicant profile</CardTitle>
             </CardHeader>
             <CardBody className="grid gap-3 text-sm sm:grid-cols-2">
               <Fact label="Gender" value={a.gender === "F" ? "Female" : a.gender === "M" ? "Male" : a.gender} />
               <Fact label="Date of birth" value={a.dateOfBirth ?? "—"} />
               <Fact label="Clan / village" value={[a.clanName, a.wardVillage].filter(Boolean).join(" · ") || "—"} />
-              <Fact label="LLG" value={a.llgName ?? "—"} />
+              <Fact label="LLG" value={a.llg?.name ?? a.llgName ?? "—"} />
               <Fact label="District" value={a.district?.name ?? "—"} />
               <Fact label="Eligibility" value={ELIGIBILITY_LABELS[a.eligibilityPath] ?? a.eligibilityPath} />
               <Fact label="Father" value={[a.fatherFullName, a.fatherOccupation].filter(Boolean).join(" — ") || "—"} />
@@ -110,16 +133,44 @@ export default async function ApplicationDetailPage({
                     href={`/api/files/${doc.id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center justify-between rounded-md border border-[#e0d8c8] px-3 py-2 text-sm hover:bg-[var(--huef-cream)]"
+                    className="flex flex-col gap-1 rounded-md border border-[#e0d8c8] px-3 py-2 text-sm hover:bg-[var(--huef-cream)] sm:flex-row sm:items-center sm:justify-between"
                   >
                     <span>
                       <span className="block font-semibold text-[var(--huef-green-dark)]">
                         {DOCUMENT_LABELS[doc.type] ?? doc.type}
                       </span>
                       <span className="text-[#6f675c]">{doc.originalName}</span>
+                      {doc.screeningStatus ? (
+                        <span className="mt-1 block text-xs text-[#6a5200]">
+                          {SCREENING_STATUS_LABELS[doc.screeningStatus as ScreeningStatus] ?? doc.screeningStatus}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="text-xs text-[#7a7266]">{fileSizeLabel(doc.sizeBytes)}</span>
                   </a>
+                ))
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Screening history</CardTitle>
+            </CardHeader>
+            <CardBody className="space-y-3 text-sm">
+              {application.screeningHistory.length === 0 ? (
+                <p className="text-[#6f675c]">No stored screening runs yet.</p>
+              ) : (
+                application.screeningHistory.map((row) => (
+                  <div key={row.id} className="rounded-md bg-[var(--huef-cream)] px-3 py-2">
+                    <p className="font-semibold text-[var(--huef-green-dark)]">
+                      {SCREENING_STATUS_LABELS[row.overallStatus as ScreeningStatus] ?? row.overallStatus}
+                    </p>
+                    <p className="text-xs text-[#6f675c]">
+                      {formatDateTime(row.createdAt)} · {row.runBy}
+                      {row.coordinatorOverride ? ` · Override: ${row.overrideReason}` : ""}
+                    </p>
+                  </div>
                 ))
               )}
             </CardBody>

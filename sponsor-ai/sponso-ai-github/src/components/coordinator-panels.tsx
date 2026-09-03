@@ -2,12 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { decideApplication, rerunScreening } from "@/app/actions";
+import { decideApplication, overrideScreening, rerunScreening } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/field";
-import { recommendationLabel, type ScreeningResult } from "@/lib/screening";
+import { Select, Textarea } from "@/components/ui/field";
+import { Alert } from "@/components/ui/alert";
+import { overallStatusLabel, recommendationLabel, type ScreeningResult } from "@/lib/screening";
 import { Badge } from "@/components/ui/card";
+import { SCREENING_STATUS_LABELS } from "@/lib/constants";
+import { formatDateTime } from "@/lib/utils";
 
 export function DecisionForm({
   applicationId,
@@ -21,6 +24,7 @@ export function DecisionForm({
   const router = useRouter();
   const [note, setNote] = useState(currentNote ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function setStatus(status: string) {
@@ -35,6 +39,7 @@ export function DecisionForm({
         setError(result.error ?? "Could not update the status.");
         return;
       }
+      setMessage(result?.message ?? "Status updated and the applicant has been notified.");
       router.refresh();
     });
   }
@@ -46,17 +51,21 @@ export function DecisionForm({
       </CardHeader>
       <CardBody className="space-y-4">
         <p className="text-sm text-[#5c564c]">
-          The screening assistant can flag problems. Only you can approve, reject, or keep this file pending.
+          The screening assistant can flag problems. Only a HUEF official can approve, reject, request more information, or keep this file pending.
         </p>
         <Textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional note the student will see (for example, why the application was unsuccessful)."
+          placeholder="Note the student will see (for example, which document to replace, or why the application was unsuccessful)."
         />
-        {error ? <p className="text-sm text-[var(--huef-red)]">{error}</p> : null}
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {message ? <Alert tone="success">{message}</Alert> : null}
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" disabled={pending} onClick={() => setStatus("PENDING")}>
             Keep pending
+          </Button>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => setStatus("MORE_INFO")}>
+            Request more information
           </Button>
           <Button type="button" disabled={pending || currentStatus === "APPROVED"} onClick={() => setStatus("APPROVED")}>
             Approve
@@ -79,9 +88,13 @@ export function ScreeningPanel({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [override, setOverride] = useState("NEEDS_REVIEW");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const tone =
-    result?.recommendation === "RECOMMEND_APPROVE"
+    result?.overallStatus === "PASSED_INITIAL"
       ? "green"
       : result?.recommendation === "RECOMMEND_REJECT"
         ? "red"
@@ -89,11 +102,11 @@ export function ScreeningPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>Screening assistant</CardTitle>
+          <CardTitle>AI screening results</CardTitle>
           <p className="mt-1 text-sm text-[#6f675c]">
-            Checks completeness, eligibility rules, and possible duplicates. It does not make the award.
+            Assistive checks only. AI must not make the scholarship award. Record your own decision below.
           </p>
         </div>
         <Button
@@ -118,12 +131,37 @@ export function ScreeningPanel({
           <>
             <div className="flex flex-wrap items-center gap-3">
               <div className="rounded-lg bg-[var(--huef-cream)] px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7a7266]">Score</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7a7266]">Completeness score</p>
                 <p className="text-2xl font-extrabold text-[var(--huef-green-dark)]">{result.score}/100</p>
               </div>
-              <Badge tone={tone}>{recommendationLabel(result.recommendation)}</Badge>
+              <Badge tone={tone}>{overallStatusLabel(result.overallStatus)}</Badge>
+              <Badge tone="neutral">{recommendationLabel(result.recommendation)}</Badge>
             </div>
+            <p className="text-xs text-[#6f675c]">
+              The completeness score is a rule-based hint (documents, eligibility, duplicates). It is not a grade and does not approve or reject the student.
+            </p>
             <p className="text-sm leading-6 text-[#3f3a34]">{result.summary}</p>
+            {result.documents?.length ? (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-[var(--huef-green)]">Document flags</p>
+                {result.documents.map((doc) => (
+                  <div key={doc.type} className="rounded-md border border-[#e0d8c8] px-3 py-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold">{doc.title}</p>
+                      <Badge tone={doc.status === "PASSED_INITIAL" ? "green" : "amber"}>
+                        {SCREENING_STATUS_LABELS[doc.status]}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-[#5c564c]">{doc.reason}</p>
+                    {doc.confidence != null ? (
+                      <p className="mt-1 text-xs text-[#6f675c]">
+                        Confidence {doc.confidence}% — {doc.confidenceExplained}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <ul className="space-y-2">
               {result.flags.map((flag) => (
                 <li
@@ -143,6 +181,45 @@ export function ScreeningPanel({
                 </li>
               ))}
             </ul>
+            <div className="space-y-2 rounded-lg bg-[var(--huef-cream)] p-3">
+              <p className="text-sm font-semibold text-[var(--huef-green-dark)]">Coordinator override</p>
+              <Select value={override} onChange={(e) => setOverride(e.target.value)}>
+                <option value="PASSED_INITIAL">Passed Initial Screening</option>
+                <option value="NEEDS_REVIEW">Needs Review</option>
+                <option value="INFORMATION_MISMATCH">Information Mismatch</option>
+                <option value="INCORRECT_DOCUMENT">Incorrect Document</option>
+              </Select>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason for overriding the AI recommendation (kept in the screening history)."
+              />
+              {error ? <Alert tone="error">{error}</Alert> : null}
+              {message ? <Alert tone="success">{message}</Alert> : null}
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={pending}
+                onClick={() => {
+                  const data = new FormData();
+                  data.set("applicationId", applicationId);
+                  data.set("override", override);
+                  data.set("reason", reason);
+                  startTransition(async () => {
+                    const result = await overrideScreening(data);
+                    if (result && "error" in result) {
+                      setError(result.error ?? "Could not record the override.");
+                      return;
+                    }
+                    setMessage(result?.message ?? "Override recorded.");
+                    router.refresh();
+                  });
+                }}
+              >
+                Record override
+              </Button>
+            </div>
+            <p className="text-xs text-[#6f675c]">Last run {formatDateTime(result.runAt)} · {result.version}</p>
           </>
         )}
       </CardBody>

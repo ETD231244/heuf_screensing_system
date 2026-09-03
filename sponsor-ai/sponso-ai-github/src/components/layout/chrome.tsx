@@ -3,13 +3,48 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SessionUser } from "@/lib/auth";
 
-export function SiteHeader({ user }: { user: SessionUser | null }) {
+export function SiteHeader({
+  user,
+  unreadCount = 0,
+}: {
+  user: SessionUser | null;
+  unreadCount?: number;
+}) {
   const [open, setOpen] = useState(false);
-  const home = user?.role === "COORDINATOR" ? "/coordinator" : user ? "/student" : "/";
+  const home =
+    user?.role === "ADMIN" ? "/admin" : user?.role === "COORDINATOR" ? "/coordinator" : user ? "/student" : "/";
+
+  const links =
+    !user
+      ? [
+          { href: "/#eligibility", label: "Eligibility" },
+          { href: "/#how-it-works", label: "How to apply" },
+          { href: "/login", label: "Sign in" },
+        ]
+      : user.role === "ADMIN"
+        ? [
+            { href: "/admin", label: "Admin" },
+            { href: "/coordinator", label: "Applications" },
+            { href: "/admin/reports", label: "Reports" },
+            { href: "/notifications", label: "Notices" },
+          ]
+        : user.role === "COORDINATOR"
+          ? [
+              { href: "/coordinator", label: "Applications" },
+              { href: "/coordinator/notices", label: "Send notice" },
+              { href: "/coordinator/reports", label: "Reports" },
+              { href: "/notifications", label: "Notices" },
+            ]
+          : [
+              { href: "/student", label: "Dashboard" },
+              { href: "/student/apply", label: "Apply" },
+              { href: "/student/profile", label: "Profile" },
+              { href: "/notifications", label: "Notices" },
+            ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-[#d9c98a] bg-[var(--huef-green)] text-white">
@@ -25,102 +60,77 @@ export function SiteHeader({ user }: { user: SessionUser | null }) {
           />
           <span className="min-w-0">
             <span className="block text-lg font-extrabold tracking-wide sm:text-xl">HUEF</span>
-            <span className="hidden text-[11px] uppercase tracking-[0.14em] text-[#f3e7b0] sm:block">
+            <span className="hidden truncate text-[11px] uppercase tracking-[0.14em] text-[#f3e7b0] sm:block">
               Empowering education — transforming futures
             </span>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-5 text-sm font-medium md:flex">
-          {!user ? (
-            <>
-              <Link href="/#eligibility" className="hover:text-[var(--huef-gold)]">
-                Eligibility
-              </Link>
-              <Link href="/#how-it-works" className="hover:text-[var(--huef-gold)]">
-                How to apply
-              </Link>
-              <Link href="/login" className="hover:text-[var(--huef-gold)]">
-                Sign in
-              </Link>
-              <Button asChild variant="gold" size="sm">
-                <Link href="/register">Create account</Link>
+        <nav className="hidden items-center gap-4 text-sm font-medium lg:flex">
+          {links.map((link) => (
+            <Link key={link.href} href={link.href} className="relative hover:text-[var(--huef-gold)]">
+              {link.label}
+              {link.href === "/notifications" && unreadCount > 0 ? (
+                <span className="absolute -right-3 -top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--huef-gold)] px-1 text-[10px] font-bold text-[var(--huef-green-dark)]">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : null}
+            </Link>
+          ))}
+          {user ? (
+            <form action="/auth/logout" method="post">
+              <Button variant="gold" size="sm" type="submit">
+                Sign out
               </Button>
-            </>
-          ) : user.role === "COORDINATOR" ? (
-            <>
-              <Link href="/coordinator" className="hover:text-[var(--huef-gold)]">
-                Applications
-              </Link>
-              <form action="/auth/logout" method="post">
-                <Button variant="gold" size="sm" type="submit">
-                  Sign out
-                </Button>
-              </form>
-            </>
+            </form>
           ) : (
-            <>
-              <Link href="/student" className="hover:text-[var(--huef-gold)]">
-                My application
-              </Link>
-              <Link href="/student/apply" className="hover:text-[var(--huef-gold)]">
-                Apply
-              </Link>
-              <form action="/auth/logout" method="post">
-                <Button variant="gold" size="sm" type="submit">
-                  Sign out
-                </Button>
-              </form>
-            </>
+            <Button asChild variant="gold" size="sm">
+              <Link href="/register">Create account</Link>
+            </Button>
           )}
         </nav>
 
-        <button
-          type="button"
-          className="rounded-md p-2 md:hidden"
-          aria-label={open ? "Close menu" : "Open menu"}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-1 lg:hidden">
+          {user ? (
+            <Link
+              href="/notifications"
+              className="relative rounded-md p-2"
+              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 ? (
+                <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[var(--huef-gold)]" />
+              ) : null}
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            className="rounded-md p-2"
+            aria-label={open ? "Close menu" : "Open menu"}
+            onClick={() => setOpen((value) => !value)}
+          >
+            {open ? <X /> : <Menu />}
+          </button>
+        </div>
       </div>
       {open ? (
-        <div className="space-y-3 border-t border-white/15 px-4 py-4 text-sm md:hidden">
-          {!user ? (
-            <>
-              <Link href="/#eligibility" className="block" onClick={() => setOpen(false)}>
-                Eligibility
-              </Link>
-              <Link href="/#how-it-works" className="block" onClick={() => setOpen(false)}>
-                How to apply
-              </Link>
-              <Link href="/login" className="block" onClick={() => setOpen(false)}>
-                Sign in
-              </Link>
-              <Button asChild variant="gold" className="w-full">
-                <Link href="/register">Create account</Link>
+        <div className="space-y-3 border-t border-white/15 px-4 py-4 text-sm lg:hidden">
+          {links.map((link) => (
+            <Link key={link.href} href={link.href} className="block" onClick={() => setOpen(false)}>
+              {link.label}
+              {link.href === "/notifications" && unreadCount > 0 ? ` (${unreadCount})` : ""}
+            </Link>
+          ))}
+          {user ? (
+            <form action="/auth/logout" method="post">
+              <Button variant="gold" className="w-full" type="submit">
+                Sign out
               </Button>
-            </>
+            </form>
           ) : (
-            <>
-              <Link
-                href={user.role === "COORDINATOR" ? "/coordinator" : "/student"}
-                className="block"
-                onClick={() => setOpen(false)}
-              >
-                Dashboard
-              </Link>
-              {user.role === "STUDENT" ? (
-                <Link href="/student/apply" className="block" onClick={() => setOpen(false)}>
-                  Apply
-                </Link>
-              ) : null}
-              <form action="/auth/logout" method="post">
-                <Button variant="gold" className="w-full" type="submit">
-                  Sign out
-                </Button>
-              </form>
-            </>
+            <Button asChild variant="gold" className="w-full">
+              <Link href="/register">Create account</Link>
+            </Button>
           )}
         </div>
       ) : null}

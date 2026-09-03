@@ -22,18 +22,22 @@ export async function GET(
   }
 
   if (session.role === "STUDENT" && document.application.applicant.userId !== session.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "You do not have permission to open this document." }, { status: 403 });
   }
 
   const bytes = await readDocumentBytes(document);
   if (!bytes) {
-    return NextResponse.json({ error: "File missing" }, { status: 404 });
+    return NextResponse.json({ error: "This file is no longer available." }, { status: 404 });
   }
 
+  const safeName = document.originalName.replace(/["\r\n]/g, "");
   return new NextResponse(bytes, {
     headers: {
       "Content-Type": document.mimeType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${document.originalName.replaceAll('"', "")}"`,
+      "Content-Disposition": `inline; filename="${safeName}"`,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-store",
+      "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'none'; sandbox",
     },
   });
 }
