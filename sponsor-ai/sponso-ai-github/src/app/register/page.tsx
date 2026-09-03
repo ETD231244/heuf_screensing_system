@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,12 +21,6 @@ export default async function RegisterPage() {
         </CardHeader>
         <CardBody className="space-y-5">
           <RegisterForm errorCode={flash} />
-          <p className="text-sm text-[#5c564c]">
-            Already registered?{" "}
-            <Link href="/login" className="font-semibold text-[var(--huef-green)] underline">
-              Sign in
-            </Link>
-          </p>
         </CardBody>
       </Card>
     </div>
