@@ -24,11 +24,10 @@ export default async function AdminHome() {
   const byRole = Object.fromEntries(users.map((row) => [row.role, row._count._all]));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-8">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--huef-green)]">Administrator</p>
-        <h1 className="mt-1 text-3xl font-extrabold text-[var(--huef-green-dark)]">System management</h1>
-        <p className="text-[#5c564c]">
+        <h1 className="text-3xl font-extrabold text-[var(--huef-green-dark)]">System management</h1>
+        <p className="mt-1 text-[#5c564c]">
           Role-based access: only administrators can change users, lookups, and configuration. Coordinators screen applications; applicants never see this area.
         </p>
       </div>

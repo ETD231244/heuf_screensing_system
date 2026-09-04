@@ -89,27 +89,14 @@ export default async function CoordinatorPage({
   }));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--huef-green)]">
-            Coordinator workspace
-          </p>
-          <h1 className="mt-1 text-3xl font-extrabold text-[var(--huef-green-dark)]">
-            2026 screening desk
-          </h1>
-          <p className="text-[#5c564c]">
-            AI prepares a first pass. You still open the file, read the documents, and record the award decision.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/coordinator/notices" className="rounded-md border border-[var(--huef-green)] px-3 py-2 text-sm font-semibold text-[var(--huef-green)]">
-            Send notice
-          </Link>
-          <Link href="/coordinator/reports" className="rounded-md bg-[var(--huef-green)] px-3 py-2 text-sm font-semibold text-white">
-            Reports
-          </Link>
-        </div>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-8">
+      <div>
+        <h1 className="text-3xl font-extrabold text-[var(--huef-green-dark)]">
+          2026 screening desk
+        </h1>
+        <p className="mt-1 text-[#5c564c]">
+          AI prepares a first pass. You still open the file, read the documents, and record the award decision.
+        </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

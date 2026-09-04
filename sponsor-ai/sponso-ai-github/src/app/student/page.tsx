@@ -103,13 +103,12 @@ export default async function StudentDashboard({
             : "This application was not successful. Read the coordinator note below.";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Avatar userId={user.id} name={fullName(a.givenName, a.surname)} hasPhoto={hasPhoto} size={72} />
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--huef-green)]">Applicant dashboard</p>
-            <h1 className="mt-1 text-3xl font-extrabold text-[var(--huef-green-dark)]">
+            <h1 className="text-3xl font-extrabold text-[var(--huef-green-dark)]">
               {fullName(a.givenName, a.surname)}
             </h1>
             <p className="text-[#5c564c]">

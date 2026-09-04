@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth";
 import { unreadNotificationCount } from "@/lib/notify";
 import { SiteFooter, SiteHeader } from "@/components/layout/chrome";
+import { AppShell } from "@/components/layout/app-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,9 +28,17 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="flex min-h-full flex-col antialiased">
-        <SiteHeader user={user} unreadCount={unread} />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
+        {user ? (
+          <AppShell user={user} unreadCount={unread}>
+            {children}
+          </AppShell>
+        ) : (
+          <>
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <SiteFooter />
+          </>
+        )}
       </body>
     </html>
   );
