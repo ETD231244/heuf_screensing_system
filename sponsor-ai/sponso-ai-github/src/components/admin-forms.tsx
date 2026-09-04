@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { ROLE_LABELS } from "@/lib/constants";
 
 export function UserManager({
@@ -74,7 +75,7 @@ export function UserManager({
               </Select>
             </Field>
             <Field label="Password" htmlFor="password" hint="Required for new accounts. Leave blank to keep the current password.">
-              <Input id="password" name="password" type="password" minLength={8} placeholder="At least 8 characters" />
+              <PasswordInput id="password" name="password" autoComplete="new-password" minLength={8} placeholder="At least 8 characters" />
             </Field>
             <Field label="Given name (new applicants)" htmlFor="givenName" optional>
               <Input id="givenName" name="givenName" placeholder="e.g. John T." />

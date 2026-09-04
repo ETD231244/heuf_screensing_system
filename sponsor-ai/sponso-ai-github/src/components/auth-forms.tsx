@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Field, Input } from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Alert } from "@/components/ui/alert";
 
 const LOGIN_ERRORS: Record<string, string> = {
@@ -56,10 +57,9 @@ export function LoginForm({ errorCode }: { errorCode?: string }) {
         />
       </Field>
       <Field label="Password" htmlFor="password" required>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           placeholder="Enter your password"
@@ -142,13 +142,13 @@ export function RegisterForm({ errorCode }: { errorCode?: string }) {
         error={fieldErrors.password}
         hint="At least 8 characters. Type the same password in both boxes."
       >
-        <Input id="password" name="password" type="password" minLength={8} required placeholder="Create a password" />
+        <PasswordInput id="password" name="password" autoComplete="new-password" minLength={8} required placeholder="Create a password" />
       </Field>
       <Field label="Confirm password" htmlFor="confirmPassword" required error={fieldErrors.confirmPassword}>
-        <Input
+        <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
+          autoComplete="new-password"
           minLength={8}
           required
           placeholder="Re-enter your password"
