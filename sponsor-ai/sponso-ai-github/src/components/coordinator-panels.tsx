@@ -184,10 +184,9 @@ export function ScreeningPanel({
             <div className="space-y-2 rounded-lg bg-[var(--huef-cream)] p-3">
               <p className="text-sm font-semibold text-[var(--huef-green-dark)]">Coordinator override</p>
               <Select value={override} onChange={(e) => setOverride(e.target.value)}>
-                <option value="PASSED_INITIAL">Passed Initial Screening</option>
-                <option value="NEEDS_REVIEW">Needs Review</option>
-                <option value="INFORMATION_MISMATCH">Information Mismatch</option>
-                <option value="INCORRECT_DOCUMENT">Incorrect Document</option>
+                {Object.entries(SCREENING_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </Select>
               <Textarea
                 value={reason}

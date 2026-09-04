@@ -17,6 +17,7 @@ import {
 } from "@/lib/constants";
 import { fileSizeLabel, formatDateTime, fullName } from "@/lib/utils";
 import { parseScreening } from "@/lib/types";
+import { DocumentPreview } from "@/components/document-preview";
 
 export default async function ApplicationDetailPage({
   params,
@@ -28,7 +29,7 @@ export default async function ApplicationDetailPage({
   const application = await prisma.application.findUnique({
     where: { id },
     include: {
-      documents: { orderBy: { type: "asc" } },
+      documents: { orderBy: [{ isCurrent: "desc" }, { uploadedAt: "desc" }] },
       institution: true,
       screeningHistory: { orderBy: { createdAt: "desc" }, take: 8 },
       applicant: { include: { user: true, district: true, llg: true } },
@@ -123,33 +124,55 @@ export default async function ApplicationDetailPage({
             <CardHeader>
               <CardTitle>Supporting documents</CardTitle>
             </CardHeader>
-            <CardBody className="space-y-2">
-              {application.documents.length === 0 ? (
+            <CardBody className="space-y-5">
+              {application.documents.filter((doc) => doc.isCurrent).length === 0 ? (
                 <p className="text-sm text-[#6f675c]">No files attached.</p>
               ) : (
-                application.documents.map((doc) => (
-                  <a
-                    key={doc.id}
-                    href={`/api/files/${doc.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex flex-col gap-1 rounded-md border border-[#e0d8c8] px-3 py-2 text-sm hover:bg-[var(--huef-cream)] sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <span>
-                      <span className="block font-semibold text-[var(--huef-green-dark)]">
-                        {DOCUMENT_LABELS[doc.type] ?? doc.type}
-                      </span>
-                      <span className="text-[#6f675c]">{doc.originalName}</span>
-                      {doc.screeningStatus ? (
-                        <span className="mt-1 block text-xs text-[#6a5200]">
-                          {SCREENING_STATUS_LABELS[doc.screeningStatus as ScreeningStatus] ?? doc.screeningStatus}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="text-xs text-[#7a7266]">{fileSizeLabel(doc.sizeBytes)}</span>
-                  </a>
-                ))
+                application.documents
+                  .filter((doc) => doc.isCurrent)
+                  .map((doc) => (
+                    <div key={doc.id} className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-[var(--huef-green-dark)]">
+                          {DOCUMENT_LABELS[doc.type] ?? doc.type}
+                        </p>
+                        {doc.screeningStatus ? (
+                          <Badge tone={doc.screeningStatus === "PASSED_INITIAL" ? "green" : "amber"}>
+                            {SCREENING_STATUS_LABELS[doc.screeningStatus as ScreeningStatus] ?? doc.screeningStatus}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <DocumentPreview
+                        id={doc.id}
+                        mimeType={doc.mimeType}
+                        originalName={doc.originalName}
+                        sizeBytes={doc.sizeBytes}
+                      />
+                    </div>
+                  ))
               )}
+              {application.documents.some((doc) => !doc.isCurrent) ? (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--huef-green)]">
+                    Previous versions (kept for audit)
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    {application.documents
+                      .filter((doc) => !doc.isCurrent)
+                      .map((doc) => (
+                        <li key={doc.id}>
+                          <a href={`/api/files/${doc.id}`} className="text-[var(--huef-green)] underline">
+                            {DOCUMENT_LABELS[doc.type] ?? doc.type} — {doc.originalName}
+                          </a>
+                          <span className="text-xs text-[#6f675c]">
+                            {" "}
+                            · replaced {formatDateTime(doc.supersededAt)} · {fileSizeLabel(doc.sizeBytes)}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ) : null}
             </CardBody>
           </Card>
 

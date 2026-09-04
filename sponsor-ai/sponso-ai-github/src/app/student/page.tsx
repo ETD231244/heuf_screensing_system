@@ -10,9 +10,9 @@ import { prisma } from "@/lib/prisma";
 import {
   ACADEMIC_YEAR,
   APPLICATION_DEADLINE_LABEL,
-  DOCUMENT_LABELS,
   SCREENING_STATUS_LABELS,
   STATUS_LABELS,
+  documentLabel,
   requiredDocuments,
 } from "@/lib/constants";
 import { formatDateTime, fullName } from "@/lib/utils";
@@ -27,28 +27,31 @@ export default async function StudentDashboard({
 }) {
   const session = await requireStudent();
   const params = await searchParams;
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    include: {
-      applicant: {
-        include: {
-          district: true,
-          llg: true,
-          applications: {
-            where: { academicYear: ACADEMIC_YEAR },
-            include: { institution: true, documents: true },
-            orderBy: { createdAt: "desc" },
-            take: 1,
+  const [user, documentTypes] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.id },
+      include: {
+        applicant: {
+          include: {
+            district: true,
+            llg: true,
+            applications: {
+              where: { academicYear: ACADEMIC_YEAR },
+              include: { institution: true, documents: { where: { isCurrent: true } } },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
           },
         },
+        notifications: {
+          where: { readAt: null },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
       },
-      notifications: {
-        where: { readAt: null },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-    },
-  });
+    }),
+    prisma.documentType.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
+  ]);
   if (!user?.applicant) redirect("/student/profile");
   const application = user.applicant.applications[0];
   const a = user.applicant;
@@ -66,8 +69,8 @@ export default async function StudentDashboard({
     hasPhoto,
   });
   const required = application
-    ? requiredDocuments(application.applicantType, a.eligibilityPath)
-    : requiredDocuments("NEW_INTAKE", a.eligibilityPath);
+    ? requiredDocuments(application.applicantType, a.eligibilityPath, documentTypes)
+    : requiredDocuments("NEW_INTAKE", a.eligibilityPath, documentTypes);
   const uploadedTypes = new Set(application?.documents.map((doc) => doc.type) ?? []);
   const missingDocs = required.filter((type) => !uploadedTypes.has(type));
   const screening = parseScreening(application?.screeningJson);
@@ -89,7 +92,7 @@ export default async function StudentDashboard({
       ? "A coordinator has asked for more information. Update the highlighted documents and resubmit."
       : application.status === "DRAFT"
         ? missingDocs.length
-          ? `Upload missing documents: ${missingDocs.map((type) => DOCUMENT_LABELS[type]).join(", ")}.`
+          ? `Upload missing documents: ${missingDocs.map((type) => documentLabel(type, documentTypes)).join(", ")}.`
           : profile.percent < 80
             ? "Finish your profile (photo, district, and LLG), then submit the form."
             : "Review the declaration and submit your application."
@@ -221,7 +224,7 @@ export default async function StudentDashboard({
                   <div key={type} className="rounded-md border border-[#eee6d6] px-3 py-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-semibold text-[var(--huef-green-dark)]">
-                        {DOCUMENT_LABELS[type]}
+                        {documentLabel(type, documentTypes)}
                       </span>
                       <Badge tone={uploaded ? (finding && finding.status !== "PASSED_INITIAL" ? "amber" : "green") : "red"}>
                         {uploaded ? finding?.status ? SCREENING_STATUS_LABELS[finding.status] : "Uploaded" : "Missing"}

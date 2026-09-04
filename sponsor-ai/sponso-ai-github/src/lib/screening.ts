@@ -4,6 +4,7 @@ import {
   HELA_DISTRICTS,
   SCREENING_STATUS_LABELS,
   requiredDocuments,
+  type DocumentTypeRule,
   type ScreeningStatus,
 } from "./constants";
 import type { DocumentScreening } from "./document-ai";
@@ -53,6 +54,7 @@ export type ScreenableApplication = {
   dateOfBirth?: string | null;
   districtName?: string | null;
   documentTypes: string[];
+  documentRules?: DocumentTypeRule[];
   documentFindings?: Array<DocumentScreening & { type: string; originalName?: string }>;
   others: Array<{
     id: string;
@@ -71,7 +73,7 @@ function clamp(n: number) {
 export function runScreening(app: ScreenableApplication): ScreeningResult {
   const flags: ScreeningFlag[] = [];
   let score = 100;
-  const required = requiredDocuments(app.applicantType, app.eligibilityPath);
+  const required = requiredDocuments(app.applicantType, app.eligibilityPath, app.documentRules);
   const missingDocuments = required.filter((type) => !app.documentTypes.includes(type));
   const documentFindings = app.documentFindings ?? [];
 

@@ -7,7 +7,7 @@ export default async function LookupsPage() {
   await requireAdmin();
   const [institutions, programs, districts, documentTypes, period] = await Promise.all([
     prisma.institution.findMany({ orderBy: { code: "asc" } }),
-    prisma.program.findMany({ orderBy: { name: "asc" } }),
+    prisma.program.findMany({ include: { institution: true }, orderBy: { name: "asc" } }),
     prisma.district.findMany({ include: { llgs: true }, orderBy: { name: "asc" } }),
     prisma.documentType.findMany({ orderBy: { code: "asc" } }),
     prisma.applicationPeriod.findUnique({ where: { academicYear: ACADEMIC_YEAR } }),
@@ -20,7 +20,11 @@ export default async function LookupsPage() {
       </div>
       <LookupsManager
         institutions={institutions}
-        programs={programs}
+        programs={programs.map((item) => ({
+          id: item.id,
+          name: item.name,
+          institutionName: item.institution?.name ?? null,
+        }))}
         districts={districts}
         documentTypes={documentTypes}
         period={

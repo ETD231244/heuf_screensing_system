@@ -142,7 +142,32 @@ export const DOCUMENT_LABELS: Record<string, string> = {
   SUPPORT_LETTER: "Support letter (non-Hela origin)",
 };
 
-export function requiredDocuments(applicantType: string, eligibilityPath: string) {
+export type DocumentTypeRule = {
+  code: string;
+  label: string;
+  requiredForNew: boolean;
+  requiredForContinuing: boolean;
+  requiredForNonHela: boolean;
+  isActive?: boolean;
+};
+
+export function requiredDocuments(
+  applicantType: string,
+  eligibilityPath: string,
+  types?: DocumentTypeRule[] | null,
+) {
+  if (types?.length) {
+    const codes: string[] = [];
+    for (const type of types) {
+      if (type.isActive === false) continue;
+      const forThisApplicant =
+        applicantType === "CONTINUING" ? type.requiredForContinuing : type.requiredForNew;
+      if (forThisApplicant) codes.push(type.code);
+      else if (eligibilityPath !== "HELA_ORIGIN" && type.requiredForNonHela) codes.push(type.code);
+    }
+    return codes;
+  }
+
   const docs =
     applicantType === "CONTINUING"
       ? [
@@ -164,6 +189,10 @@ export function requiredDocuments(applicantType: string, eligibilityPath: string
     docs.push("SUPPORT_LETTER");
   }
   return docs;
+}
+
+export function documentLabel(code: string, types?: DocumentTypeRule[] | null) {
+  return types?.find((type) => type.code === code)?.label ?? DOCUMENT_LABELS[code] ?? code;
 }
 
 export const INSTITUTIONS = [

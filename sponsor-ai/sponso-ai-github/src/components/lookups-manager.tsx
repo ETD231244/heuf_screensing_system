@@ -22,7 +22,7 @@ export function LookupsManager({
   period,
 }: {
   institutions: Array<{ id: string; code: string; name: string; category: string }>;
-  programs: Array<{ id: string; name: string }>;
+  programs: Array<{ id: string; name: string; institutionName?: string | null }>;
   districts: Array<{ id: string; name: string; llgs: Array<{ id: string; name: string }> }>;
   documentTypes: Array<{ id: string; code: string; label: string }>;
   period: { academicYear: string; title: string; opensAt: string; closesAt: string } | null;
@@ -72,10 +72,23 @@ export function LookupsManager({
         <CardBody>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); submit(adminSaveProgram, e.currentTarget); }}>
             <Field label="Programme / course" htmlFor="name"><Input id="name" name="name" required placeholder="Select or enter your program" /></Field>
+            <Field label="Institution" htmlFor="institutionId">
+              <Select id="institutionId" name="institutionId" defaultValue="">
+                <option value="">All institutions (shared list)</option>
+                {institutions.map((item) => (
+                  <option key={item.id} value={item.id}>{item.code} — {item.name}</option>
+                ))}
+              </Select>
+            </Field>
             <Button type="submit">Add programme</Button>
           </form>
           <ul className="mt-3 max-h-40 overflow-auto text-sm text-[#5c564c]">
-            {programs.map((item) => <li key={item.id}>{item.name}</li>)}
+            {programs.map((item) => (
+              <li key={item.id}>
+                {item.name}
+                {item.institutionName ? ` — ${item.institutionName}` : ""}
+              </li>
+            ))}
           </ul>
         </CardBody>
       </Card>

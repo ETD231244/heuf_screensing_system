@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth";
 import { unreadNotificationCount } from "@/lib/notify";
@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   title: "HUEF Online Application Screening and Management System",
   description:
     "Apply online for Hela Undialu Education Foundation tuition fee assistance and track your application status.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default async function RootLayout({

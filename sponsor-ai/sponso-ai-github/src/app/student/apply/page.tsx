@@ -6,7 +6,7 @@ import { ACADEMIC_YEAR } from "@/lib/constants";
 
 export default async function ApplyPage() {
   const session = await requireStudent();
-  const [user, institutions] = await Promise.all([
+  const [user, institutions, programs, documentTypes] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.id },
       include: {
@@ -15,7 +15,7 @@ export default async function ApplyPage() {
             district: true,
             applications: {
               where: { academicYear: ACADEMIC_YEAR },
-              include: { documents: true, institution: true },
+              include: { documents: { where: { isCurrent: true } }, institution: true },
               orderBy: { createdAt: "desc" },
               take: 1,
             },
@@ -24,6 +24,8 @@ export default async function ApplyPage() {
       },
     }),
     prisma.institution.findMany({ orderBy: { code: "asc" } }),
+    prisma.program.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.documentType.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
   ]);
 
   if (!user?.applicant) redirect("/register");
@@ -108,6 +110,19 @@ export default async function ApplyPage() {
       <ApplicationWizard
         initial={initial}
         institutions={institutions}
+        programs={programs.map((item) => ({
+          id: item.id,
+          name: item.name,
+          institutionId: item.institutionId,
+        }))}
+        documentTypes={documentTypes.map((item) => ({
+          code: item.code,
+          label: item.label,
+          requiredForNew: item.requiredForNew,
+          requiredForContinuing: item.requiredForContinuing,
+          requiredForNonHela: item.requiredForNonHela,
+          isActive: item.isActive,
+        }))}
         documents={
           application?.documents.map((doc) => ({
             id: doc.id,

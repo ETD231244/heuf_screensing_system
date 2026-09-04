@@ -182,10 +182,12 @@ model Document {
   screeningJson   String?
   extractedText   String?
   pageEstimate    Int?
+  isCurrent       Boolean     @default(true)
+  supersededAt    DateTime?
   uploadedAt      DateTime    @default(now())
   application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
-  @@unique([applicationId, type])
+  @@index([applicationId, type, isCurrent])
   @@index([sha256])
 }
 

@@ -9,7 +9,6 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/field";
 import {
   COMMON_PROGRAMS,
-  DOCUMENT_LABELS,
   ELIGIBILITY_LABELS,
   FEE_CATEGORY_LABELS,
   HELA_DISTRICTS,
@@ -17,8 +16,10 @@ import {
   SCREENING_STATUS_LABELS,
   STUDY_LEVEL_LABELS,
   YEAR_LEVELS,
+  documentLabel,
   llgsForDistrict,
   requiredDocuments,
+  type DocumentTypeRule,
 } from "@/lib/constants";
 import { fileSizeLabel } from "@/lib/utils";
 import { Alert } from "@/components/ui/alert";
@@ -106,10 +107,14 @@ const STEPS = [
 export function ApplicationWizard({
   initial,
   institutions,
+  programs = [],
+  documentTypes = [],
   documents: initialDocuments,
 }: {
   initial: WizardValues;
   institutions: Institution[];
+  programs?: Array<{ id: string; name: string; institutionId: string | null }>;
+  documentTypes?: DocumentTypeRule[];
   documents: Doc[];
 }) {
   const router = useRouter();
@@ -134,10 +139,16 @@ export function ApplicationWizard({
     return data;
   }
 
-  const needed = requiredDocuments(values.applicantType, values.eligibilityPath);
+  const needed = requiredDocuments(values.applicantType, values.eligibilityPath, documentTypes);
   const have = new Set(documents.map((doc) => doc.type));
   const missing = needed.filter((type) => !have.has(type));
   const llgs = llgsForDistrict(values.districtName);
+  const programChoices = useMemo(() => {
+    const fromInstitution = programs
+      .filter((item) => !item.institutionId || item.institutionId === values.institutionId)
+      .map((item) => item.name);
+    return [...new Set([...fromInstitution, ...COMMON_PROGRAMS])];
+  }, [programs, values.institutionId]);
   const groupedInstitutions = useMemo(() => {
     const groups = new Map<string, Institution[]>();
     for (const item of institutions) {
@@ -178,7 +189,7 @@ export function ApplicationWizard({
       if (result && "warning" in result && result.warning) {
         setWarning(result.warning);
       } else {
-        setMessage(result?.message ?? `${DOCUMENT_LABELS[type] ?? type} was uploaded successfully and is awaiting screening.`);
+        setMessage(result?.message ?? `${documentLabel(type, documentTypes)} was uploaded successfully and is awaiting screening.`);
       }
       router.refresh();
       setDocuments((current) => {
@@ -453,7 +464,14 @@ export function ApplicationWizard({
                 </Select>
               </Field>
               <Field label="Institution (2026 nominated list)" htmlFor="institutionId" required>
-                <Select id="institutionId" value={values.institutionId} onChange={(e) => set("institutionId", e.target.value)}>
+                <Select
+                  id="institutionId"
+                  value={values.institutionId}
+                  onChange={(e) => {
+                    set("institutionId", e.target.value);
+                    set("programName", "");
+                  }}
+                >
                   <option value="">Select institution</option>
                   {[...groupedInstitutions.entries()].map(([category, items]) => (
                     <optgroup key={category} label={category}>
@@ -466,10 +484,10 @@ export function ApplicationWizard({
                   ))}
                 </Select>
               </Field>
-              <Field label="Programme / course" htmlFor="programName" required hint="Select a common programme or type your exact course name.">
+              <Field label="Programme / course" htmlFor="programName" required hint="Choose a programme listed for this institution, or type your exact course name.">
                 <Input id="programName" value={values.programName} onChange={(e) => set("programName", e.target.value)} list="huef-programs" placeholder="Select or enter your program" />
                 <datalist id="huef-programs">
-                  {COMMON_PROGRAMS.map((name) => (
+                  {programChoices.map((name) => (
                     <option key={name} value={name} />
                   ))}
                 </datalist>
@@ -575,7 +593,7 @@ export function ApplicationWizard({
                   <div key={type} className="rounded-lg border border-[#e0d8c8] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-[var(--huef-green-dark)]">{DOCUMENT_LABELS[type]}</p>
+                        <p className="font-semibold text-[var(--huef-green-dark)]">{documentLabel(type, documentTypes)}</p>
                         {existing ? (
                           <p className="mt-1 text-sm text-[#5c564c]">
                             {existing.originalName} · {fileSizeLabel(existing.sizeBytes)}
@@ -626,7 +644,7 @@ export function ApplicationWizard({
                 <ReviewRow label="Programme" value={values.programName || "—"} />
                 <ReviewRow label="Year of study" value={values.yearOfStudy || "—"} />
                 <ReviewRow label="Fee category" value={FEE_CATEGORY_LABELS[values.feeCategory]} />
-                <ReviewRow label="Documents still missing" value={missing.length ? missing.map((t) => DOCUMENT_LABELS[t]).join(", ") : "None"} />
+                <ReviewRow label="Documents still missing" value={missing.length ? missing.map((t) => documentLabel(t, documentTypes)).join(", ") : "None"} />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Witness name (councillor, pastor, or community leader)" htmlFor="witnessName" required>

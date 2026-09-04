@@ -19,7 +19,7 @@ export async function saveDocumentFile(options: {
     const ext = originalName.includes(".")
       ? originalName.slice(originalName.lastIndexOf("."))
       : "";
-    storedPath = path.join(dir, `${type}${ext}`);
+    storedPath = path.join(dir, `${type}-${Date.now()}${ext}`);
     await writeFile(storedPath, bytes);
   } catch {
     storedPath = "";
@@ -30,21 +30,12 @@ export async function saveDocumentFile(options: {
   const extractedText = kind === "pdf" ? extractPdfText(bytes) : "";
   const pageEstimate = kind === "pdf" ? estimatePdfPages(bytes) : null;
   const sha256 = sha256Hex(bytes);
-  await prisma.document.upsert({
-    where: { applicationId_type: { applicationId, type } },
-    update: {
-      originalName,
-      storedPath,
-      mimeType,
-      sizeBytes: bytes.length,
-      contents: payload,
-      sha256,
-      extractedText: extractedText || null,
-      pageEstimate,
-      screeningStatus: null,
-      screeningJson: null,
-    },
-    create: {
+  await prisma.document.updateMany({
+    where: { applicationId, type, isCurrent: true },
+    data: { isCurrent: false, supersededAt: new Date() },
+  });
+  await prisma.document.create({
+    data: {
       applicationId,
       type,
       originalName,
@@ -55,6 +46,7 @@ export async function saveDocumentFile(options: {
       sha256,
       extractedText: extractedText || null,
       pageEstimate,
+      isCurrent: true,
     },
   });
 }

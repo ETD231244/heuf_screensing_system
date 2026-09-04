@@ -2,16 +2,14 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireCoordinator } from "@/lib/auth";
 import { Badge, Card, CardBody, CardHeader, CardTitle, statusTone } from "@/components/ui/card";
-import { Select } from "@/components/ui/field";
 import {
   ACADEMIC_YEAR,
   HELA_DISTRICTS,
   SCREENING_STATUS_LABELS,
   STATUS_LABELS,
-  YEAR_LEVELS,
-  llgsForDistrict,
   type ScreeningStatus,
 } from "@/lib/constants";
+import { CoordinatorFilters } from "@/components/coordinator-filters";
 import { formatDate, fullName } from "@/lib/utils";
 import { parseScreening } from "@/lib/types";
 import { recommendationLabel } from "@/lib/screening";
@@ -32,7 +30,6 @@ export default async function CoordinatorPage({
 }) {
   await requireCoordinator();
   const params = await searchParams;
-  const llgs = llgsForDistrict(params.district);
   const [institutions, applications, counts, allSubmitted] = await Promise.all([
     prisma.institution.findMany({ orderBy: { code: "asc" } }),
     prisma.application.findMany({
@@ -140,56 +137,18 @@ export default async function CoordinatorPage({
         </CardBody>
       </Card>
 
-      <form className="grid gap-3 rounded-xl border border-[#e0d8c8] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <input
-          name="q"
-          defaultValue={params.q ?? ""}
-          placeholder="Search name, email, programme"
-          className="h-11 rounded-md border border-[#cfc6b4] px-3"
-        />
-        <Select name="district" defaultValue={params.district ?? ""}>
-          <option value="">All districts</option>
-          {HELA_DISTRICTS.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </Select>
-        <Select name="llg" defaultValue={params.llg ?? ""}>
-          <option value="">All LLGs</option>
-          {llgs.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </Select>
-        <Select name="institution" defaultValue={params.institution ?? ""}>
-          <option value="">All institutions</option>
-          {institutions.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.code} — {item.name}
-            </option>
-          ))}
-        </Select>
-        <Select name="year" defaultValue={params.year ?? ""}>
-          <option value="">All year levels</option>
-          {YEAR_LEVELS.map((year) => (
-            <option key={year} value={year}>{year}</option>
-          ))}
-        </Select>
-        <Select name="status" defaultValue={params.status ?? ""}>
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="MORE_INFO">More information</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Not successful</option>
-        </Select>
-        <Select name="screening" defaultValue={params.screening ?? ""}>
-          <option value="">All screening results</option>
-          {Object.entries(SCREENING_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </Select>
-        <button type="submit" className="h-11 rounded-md bg-[var(--huef-green)] px-4 text-sm font-semibold text-white">
-          Filter
-        </button>
-      </form>
+      <CoordinatorFilters
+        institutions={institutions}
+        initial={{
+          district: params.district,
+          llg: params.llg,
+          institution: params.institution,
+          status: params.status,
+          screening: params.screening,
+          year: params.year,
+          q: params.q,
+        }}
+      />
 
       {applications.length === 0 ? (
         <Card>

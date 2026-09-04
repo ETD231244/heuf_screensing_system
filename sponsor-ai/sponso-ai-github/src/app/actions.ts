@@ -367,7 +367,7 @@ export async function submitApplication(formData: FormData) {
 
   const application = await prisma.application.findUnique({
     where: { id: draft.applicationId },
-    include: { documents: true, applicant: true },
+    include: { documents: { where: { isCurrent: true } }, applicant: true },
   });
   if (!application || application.applicantId !== applicant.id) {
     return { error: "We could not find that application. Please sign in again and retry." };
@@ -402,9 +402,11 @@ export async function submitApplication(formData: FormData) {
     };
   }
 
+  const documentTypes = await prisma.documentType.findMany({ where: { isActive: true } });
   const required = requiredDocuments(
     application.applicantType,
     application.applicant.eligibilityPath,
+    documentTypes,
   );
   const have = new Set(application.documents.map((doc) => doc.type));
   const missingDocs = required.filter((type) => !have.has(type));
@@ -673,7 +675,18 @@ export async function overrideScreening(formData: FormData) {
   const applicationId = String(formData.get("applicationId") ?? "");
   const override = String(formData.get("override") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!["PASSED_INITIAL", "NEEDS_REVIEW", "INFORMATION_MISMATCH", "INCORRECT_DOCUMENT"].includes(override)) {
+  if (
+    ![
+      "PASSED_INITIAL",
+      "NEEDS_REVIEW",
+      "INFORMATION_MISMATCH",
+      "INCORRECT_DOCUMENT",
+      "UNREADABLE_DOCUMENT",
+      "MISSING_REQUIRED",
+      "POTENTIAL_DUPLICATE",
+      "UNABLE_TO_DETERMINE",
+    ].includes(override)
+  ) {
     return { error: "Choose a valid override outcome." };
   }
   if (reason.length < 8) {

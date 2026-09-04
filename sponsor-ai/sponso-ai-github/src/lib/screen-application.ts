@@ -10,14 +10,17 @@ export async function screenApplication(
   applicationId: string,
   runBy = "SYSTEM",
 ): Promise<ScreeningResult> {
-  const application = await prisma.application.findUnique({
-    where: { id: applicationId },
-    include: {
-      documents: true,
-      institution: true,
-      applicant: { include: { user: true, district: true } },
-    },
-  });
+  const [application, documentRules] = await Promise.all([
+    prisma.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        documents: { where: { isCurrent: true } },
+        institution: true,
+        applicant: { include: { user: true, district: true } },
+      },
+    }),
+    prisma.documentType.findMany({ where: { isActive: true } }),
+  ]);
   if (!application) {
     throw new Error("Application not found");
   }
@@ -37,6 +40,7 @@ export async function screenApplication(
         where: {
           sha256: { in: hashes },
           applicationId: { not: applicationId },
+          isCurrent: true,
         },
         include: {
           application: { include: { applicant: true } },
@@ -104,6 +108,7 @@ export async function screenApplication(
     dateOfBirth: application.applicant.dateOfBirth,
     districtName: application.applicant.district?.name,
     documentTypes: application.documents.map((doc) => doc.type),
+    documentRules,
     documentFindings,
     others: others.map((item) => ({
       id: item.id,

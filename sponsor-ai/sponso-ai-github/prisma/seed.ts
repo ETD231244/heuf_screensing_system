@@ -86,7 +86,13 @@ async function main() {
       { name: "Bachelor of Information Systems", institutionId: inst.A5.id },
       { name: "Bachelor of Education", institutionId: inst.A2.id },
       { name: "Bachelor of Science", institutionId: inst.A1.id },
+      { name: "Bachelor of Arts", institutionId: inst.A1.id },
+      { name: "Bachelor of Engineering (Civil)", institutionId: inst.A3.id },
       { name: "Diploma of Primary Teaching", institutionId: inst.B1.id },
+      { name: "Certificate in Community Health Work", institutionId: inst.C23.id },
+      { name: "Bachelor of Nursing", institutionId: inst.C1.id },
+      { name: "Grade 11", institutionId: inst.H1.id },
+      { name: "Grade 12", institutionId: inst.H1.id },
     ],
   });
 
