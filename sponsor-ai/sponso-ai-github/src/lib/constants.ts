@@ -1,6 +1,7 @@
 export { DISTRICT_LLGS, HELA_DISTRICTS, llgsForDistrict, type HelaDistrict } from "./geo";
 
 export const ACADEMIC_YEAR = "2026";
+export const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
 export const SESSION_COOKIE = "huef_session";
 export const FLASH_COOKIE = "huef_flash";
 export const GOOGLE_STATE_COOKIE = "huef_google_oauth";

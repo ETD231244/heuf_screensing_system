@@ -499,7 +499,7 @@ async function main() {
       }
     }
 
-    await screenApplication(application.id, "SYSTEM");
+    await screenApplication(application.id, "SYSTEM", { llm: false });
     await prisma.notification.create({
       data: {
         userId: user.id,

@@ -22,6 +22,7 @@ export function parseScreening(json?: string | null): ScreeningResult | null {
       documents: parsed.documents ?? [],
       runAt: parsed.runAt ?? new Date().toISOString(),
       version: parsed.version ?? "HUEF AI Screening Engine v1",
+      deepseek: parsed.deepseek ?? null,
     };
   } catch {
     return null;

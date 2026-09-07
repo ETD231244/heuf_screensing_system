@@ -10,11 +10,15 @@ import {
 } from "@/lib/constants";
 import { CoordinatorFilters } from "@/components/coordinator-filters";
 import { CoordinatorLiveDashboard } from "@/components/coordinator-live-dashboard";
+import { DeepSeekDeskActions } from "@/components/coordinator-panels";
 import { loadCoordinatorDashboard } from "@/lib/coordinator-dashboard";
+import { isDeepSeekConfigured } from "@/lib/deepseek";
 import { formatDate, fullName } from "@/lib/utils";
 import { parseScreening } from "@/lib/types";
 import { recommendationLabel } from "@/lib/screening";
 import { Avatar } from "@/components/ui/avatar";
+
+export const maxDuration = 60;
 
 export default async function CoordinatorPage({
   searchParams,
@@ -31,7 +35,7 @@ export default async function CoordinatorPage({
 }) {
   await requireCoordinator();
   const params = await searchParams;
-  const [institutions, applications, dashboard] = await Promise.all([
+  const [institutions, applications, dashboard, deepSeekReady] = await Promise.all([
     prisma.institution.findMany({ orderBy: { code: "asc" } }),
     prisma.application.findMany({
       where: {
@@ -63,6 +67,7 @@ export default async function CoordinatorPage({
       orderBy: { submittedAt: "desc" },
     }),
     loadCoordinatorDashboard(),
+    isDeepSeekConfigured(),
   ]);
 
   return (
@@ -72,9 +77,11 @@ export default async function CoordinatorPage({
           2026 screening desk
         </h1>
         <p className="mt-1 text-[#5c564c]">
-          AI prepares a first pass. You still open the file, read the documents, and record the award decision.
+          AI prepares a first pass with DeepSeek. You still open the file, read the documents, and record the award decision.
         </p>
       </div>
+
+      <DeepSeekDeskActions ready={deepSeekReady} />
 
       <CoordinatorLiveDashboard initialData={dashboard} />
 

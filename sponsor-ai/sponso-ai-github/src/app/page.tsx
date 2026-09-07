@@ -66,8 +66,8 @@ export default async function HomePage() {
           {[
             { icon: ShieldCheck, title: "Register", text: "Create an account with your name, phone, and email — or sign in with Google, then complete HUEF-specific details." },
             { icon: GraduationCap, title: "Fill the 2026 form", text: "Personal details, origin, institution, programme, and fee information — in block letters, on a phone or a computer." },
-            { icon: FolderOpen, title: "Upload documents", text: "The system checks that every required file is attached and runs a preliminary AI screening before you can finish." },
-            { icon: FileSearch, title: "Coordinator decides", text: "AI flags gaps, mismatches, and duplicates. A HUEF official records Approved, Rejected, or requests more information." },
+            { icon: FolderOpen, title: "Upload documents", text: "The system checks that every required file is attached and runs a preliminary screening before you can finish." },
+            { icon: FileSearch, title: "Coordinator decides", text: "DeepSeek briefs the officer on gaps, mismatches, and duplicates. A HUEF official still records Approved, Rejected, or more information." },
           ].map((item) => (
             <Card key={item.title}>
               <CardBody>

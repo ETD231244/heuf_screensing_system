@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCoordinator } from "@/lib/auth";
 import { Badge, Card, CardBody, CardHeader, CardTitle, statusTone } from "@/components/ui/card";
 import { DecisionForm, ScreeningPanel } from "@/components/coordinator-panels";
+import { isDeepSeekConfigured } from "@/lib/deepseek";
 import { Alert } from "@/components/ui/alert";
 import { Avatar } from "@/components/ui/avatar";
 import {
@@ -19,6 +20,8 @@ import { fileSizeLabel, formatDateTime, fullName } from "@/lib/utils";
 import { parseScreening } from "@/lib/types";
 import { DocumentPreview } from "@/components/document-preview";
 
+export const maxDuration = 60;
+
 export default async function ApplicationDetailPage({
   params,
 }: {
@@ -26,15 +29,18 @@ export default async function ApplicationDetailPage({
 }) {
   await requireCoordinator();
   const { id } = await params;
-  const application = await prisma.application.findUnique({
-    where: { id },
-    include: {
-      documents: { orderBy: [{ isCurrent: "desc" }, { uploadedAt: "desc" }] },
-      institution: true,
-      screeningHistory: { orderBy: { createdAt: "desc" }, take: 8 },
-      applicant: { include: { user: true, district: true, llg: true } },
-    },
-  });
+  const [application, deepSeekReady] = await Promise.all([
+    prisma.application.findUnique({
+      where: { id },
+      include: {
+        documents: { orderBy: [{ isCurrent: "desc" }, { uploadedAt: "desc" }] },
+        institution: true,
+        screeningHistory: { orderBy: { createdAt: "desc" }, take: 8 },
+        applicant: { include: { user: true, district: true, llg: true } },
+      },
+    }),
+    isDeepSeekConfigured(),
+  ]);
   if (!application || application.status === "DRAFT") notFound();
   const a = application.applicant;
   const screening = parseScreening(application.screeningJson);
@@ -75,7 +81,7 @@ export default async function ApplicationDetailPage({
       </div>
 
       <Alert tone="info">
-        Open the applicant profile, uploaded documents, AI findings, and screening history together on this page. The AI recommendation is assistive only.
+        Open the applicant profile, uploaded documents, DeepSeek briefing, and screening history together. DeepSeek does not make the award.
       </Alert>
 
       <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
@@ -201,7 +207,7 @@ export default async function ApplicationDetailPage({
         </div>
 
         <div className="space-y-5">
-          <ScreeningPanel applicationId={application.id} result={screening} />
+          <ScreeningPanel applicationId={application.id} result={screening} deepSeekReady={deepSeekReady} />
           <DecisionForm
             applicationId={application.id}
             currentStatus={application.status}

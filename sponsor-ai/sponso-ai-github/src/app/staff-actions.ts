@@ -218,6 +218,9 @@ export async function adminSaveSetting(formData: FormData) {
   const key = field(formData, "key");
   const value = field(formData, "value");
   if (!key) return { error: "Missing setting key." };
+  if (key === "deepseek_api_key" && !value) {
+    return { ok: true as const, message: "DeepSeek API key left unchanged." };
+  }
   await prisma.systemSetting.upsert({
     where: { key },
     update: { value },

@@ -24,6 +24,19 @@ export type DuplicateMatch = {
   reason: string;
 };
 
+export type DeepSeekScreening = {
+  used: boolean;
+  configured: boolean;
+  model: string;
+  ranAt?: string;
+  error?: string;
+  brief?: string;
+  remainingChecks?: string[];
+  draftApplicantNote?: string;
+  suggestedDecision?: "PENDING" | "MORE_INFO" | "APPROVED" | "REJECTED";
+  suggestedDecisionLabel?: string;
+};
+
 export type ScreeningResult = {
   score: number;
   recommendation: "RECOMMEND_APPROVE" | "NEEDS_REVIEW" | "RECOMMEND_REJECT";
@@ -35,6 +48,7 @@ export type ScreeningResult = {
   documents: Array<DocumentScreening & { type: string; originalName?: string }>;
   runAt: string;
   version: string;
+  deepseek?: DeepSeekScreening | null;
 };
 
 export type ScreenableApplication = {

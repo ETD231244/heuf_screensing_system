@@ -10,7 +10,7 @@ const links = [
   { href: "/admin/announcements", title: "Announcements", text: "Publish notices and deadlines to applicants or staff." },
   { href: "/admin/audit", title: "Audit trail", text: "Submissions, uploads, screening, decisions, and admin changes." },
   { href: "/admin/reports", title: "Reports", text: "Applications by institution, district, LLG, programme, status, and screening." },
-  { href: "/admin/settings", title: "System configuration", text: "Intake messages and operational settings." },
+  { href: "/admin/settings", title: "System configuration", text: "Intake messages, DeepSeek API key, and operational settings." },
 ];
 
 export default async function AdminHome() {

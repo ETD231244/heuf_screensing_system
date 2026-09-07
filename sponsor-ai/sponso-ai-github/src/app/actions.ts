@@ -24,6 +24,7 @@ import {
 import { recordAudit } from "@/lib/audit";
 import { notifyUser } from "@/lib/notify";
 import { screenApplication } from "@/lib/screen-application";
+import { isDeepSeekConfigured } from "@/lib/deepseek";
 import { deleteStoredFile, saveDocumentFile } from "@/lib/documents";
 import { safeErrorMessage, validateProfilePhoto, validateUploadedFile } from "@/lib/security";
 import { llgsForDistrict } from "@/lib/geo";
@@ -425,7 +426,7 @@ export async function submitApplication(formData: FormData) {
       infoRequestedAt: null,
     },
   });
-  const screening = await screenApplication(application.id, user.email);
+  const screening = await screenApplication(application.id, user.email, { llm: true });
   await createSession({
     ...session,
     givenName: application.applicant.givenName,
@@ -723,7 +724,7 @@ export async function overrideScreening(formData: FormData) {
 
 export async function rerunScreening(applicationId: string) {
   const session = await requireCoordinator();
-  await screenApplication(applicationId, session.email);
+  await screenApplication(applicationId, session.email, { llm: true });
   await recordAudit({
     actorId: session.id,
     actorEmail: session.email,
@@ -731,9 +732,42 @@ export async function rerunScreening(applicationId: string) {
     entityType: "Application",
     entityId: applicationId,
     applicationId,
-    details: "Coordinator re-ran AI screening",
+    details: "Coordinator re-ran DeepSeek AI screening",
   });
-  return { ok: true as const, message: "Screening was run again. Review the updated flags before you decide." };
+  return { ok: true as const, message: "DeepSeek screened this file again. Read the briefing, then record your own decision." };
+}
+
+export async function screenNextPendingWithDeepSeek() {
+  const session = await requireCoordinator();
+  const configured = await isDeepSeekConfigured();
+  if (!configured) {
+    return {
+      error: "DeepSeek is not configured yet. An administrator must add a DeepSeek API key under Settings.",
+    };
+  }
+  const next = await prisma.application.findFirst({
+    where: { academicYear: ACADEMIC_YEAR, status: "PENDING" },
+    orderBy: { submittedAt: "asc" },
+    select: { id: true, applicant: { select: { givenName: true, surname: true } } },
+  });
+  if (!next) {
+    return { error: "There are no pending applications waiting for screening." };
+  }
+  await screenApplication(next.id, session.email, { llm: true });
+  await recordAudit({
+    actorId: session.id,
+    actorEmail: session.email,
+    action: "SCREENING_RERUN",
+    entityType: "Application",
+    entityId: next.id,
+    applicationId: next.id,
+    details: "Coordinator ran DeepSeek on the next pending file",
+  });
+  return {
+    ok: true as const,
+    applicationId: next.id,
+    message: `DeepSeek screened ${next.applicant.givenName} ${next.applicant.surname}. Open the file to read the briefing.`,
+  };
 }
 
 export async function sendApplicantNotice(formData: FormData) {

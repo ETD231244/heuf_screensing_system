@@ -1,14 +1,16 @@
 import { prisma } from "./prisma";
 import { runScreening, type ScreeningResult } from "./screening";
 import { ACADEMIC_YEAR } from "./constants";
-import { extractPdfText, estimatePdfPages, screenUploadedDocument } from "./document-ai";
+import { extractPdfText, estimatePdfPages, screenUploadedDocument, type DocumentScreening } from "./document-ai";
 import { detectFileKind } from "./security";
 import { fullName } from "./utils";
 import { readDocumentBytes } from "./documents";
+import { mergeDeepSeekResult, runDeepSeekScreening } from "./deepseek";
 
 export async function screenApplication(
   applicationId: string,
   runBy = "SYSTEM",
+  options?: { llm?: boolean },
 ): Promise<ScreeningResult> {
   const [application, documentRules] = await Promise.all([
     prisma.application.findUnique({
@@ -16,7 +18,7 @@ export async function screenApplication(
       include: {
         documents: { where: { isCurrent: true } },
         institution: true,
-        applicant: { include: { user: true, district: true } },
+        applicant: { include: { user: true, district: true, llg: true } },
       },
     }),
     prisma.documentType.findMany({ where: { isActive: true } }),
@@ -48,7 +50,8 @@ export async function screenApplication(
       })
     : [];
 
-  const documentFindings = [];
+  const documentFindings: Array<DocumentScreening & { type: string; originalName: string }> = [];
+  const extractedByType = new Map<string, string>();
   for (const doc of application.documents) {
     const bytes = await readDocumentBytes(doc);
     const kind = bytes ? detectFileKind(bytes) : "unknown";
@@ -80,6 +83,7 @@ export async function screenApplication(
       type: doc.type,
       originalName: doc.originalName,
     });
+    extractedByType.set(doc.type, extractedText);
     await prisma.document.update({
       where: { id: doc.id },
       data: {
@@ -120,22 +124,55 @@ export async function screenApplication(
     })),
   });
 
+  let finalResult = result;
+  if (options?.llm) {
+    const { briefing, raw } = await runDeepSeekScreening({
+      applicantName: fullName(application.applicant.givenName, application.applicant.surname),
+      email: application.applicant.user.email,
+      phone: application.applicant.phone,
+      dateOfBirth: application.applicant.dateOfBirth,
+      gender: application.applicant.gender,
+      district: application.applicant.district?.name,
+      llg: application.applicant.llg?.name ?? application.applicant.llgName,
+      clan: application.applicant.clanName,
+      village: application.applicant.wardVillage,
+      eligibilityPath: application.applicant.eligibilityPath,
+      publicServantYears: application.applicant.publicServantYears,
+      applicantType: application.applicantType,
+      programName: application.programName,
+      yearOfStudy: application.yearOfStudy,
+      institutionName: application.institution.name,
+      feeCategory: application.feeCategory,
+      tuitionFees: application.tuitionFees,
+      witnessName: application.witnessName,
+      documents: application.documents.map((doc, index) => ({
+        type: doc.type,
+        originalName: doc.originalName,
+        status: documentFindings[index]?.status ?? doc.screeningStatus ?? "UNABLE_TO_DETERMINE",
+        reason: documentFindings[index]?.reason ?? "No heuristic note.",
+        extractedText: extractedByType.get(doc.type) || "",
+      })),
+      rules: result,
+    });
+    finalResult = mergeDeepSeekResult(result, briefing, raw);
+  }
+
   await prisma.application.update({
     where: { id: applicationId },
     data: {
-      screeningJson: JSON.stringify(result),
-      screeningStatus: result.overallStatus,
+      screeningJson: JSON.stringify(finalResult),
+      screeningStatus: finalResult.overallStatus,
     },
   });
 
   await prisma.screeningHistory.create({
     data: {
       applicationId,
-      resultJson: JSON.stringify(result),
-      overallStatus: result.overallStatus,
+      resultJson: JSON.stringify(finalResult),
+      overallStatus: finalResult.overallStatus,
       runBy,
     },
   });
 
-  return result;
+  return finalResult;
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { decideApplication, overrideScreening, rerunScreening } from "@/app/actions";
+import { decideApplication, overrideScreening, rerunScreening, screenNextPendingWithDeepSeek } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, Textarea } from "@/components/ui/field";
@@ -26,6 +26,15 @@ export function DecisionForm({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    function onDraft(event: Event) {
+      const text = (event as CustomEvent<string>).detail;
+      if (typeof text === "string" && text.trim()) setNote(text);
+    }
+    window.addEventListener("huef-use-draft-note", onDraft);
+    return () => window.removeEventListener("huef-use-draft-note", onDraft);
+  }, []);
 
   function setStatus(status: string) {
     setError(null);
@@ -51,7 +60,7 @@ export function DecisionForm({
       </CardHeader>
       <CardBody className="space-y-4">
         <p className="text-sm text-[#5c564c]">
-          The screening assistant can flag problems. Only a HUEF official can approve, reject, request more information, or keep this file pending.
+          DeepSeek prepares a briefing and can draft the student note. Only a HUEF official can approve, reject, request more information, or keep this file pending.
         </p>
         <Textarea
           value={note}
@@ -82,9 +91,11 @@ export function DecisionForm({
 export function ScreeningPanel({
   applicationId,
   result,
+  deepSeekReady,
 }: {
   applicationId: string;
   result: ScreeningResult | null;
+  deepSeekReady: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -104,9 +115,9 @@ export function ScreeningPanel({
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>AI screening results</CardTitle>
+          <CardTitle>DeepSeek screening</CardTitle>
           <p className="mt-1 text-sm text-[#6f675c]">
-            Assistive checks only. AI must not make the scholarship award. Record your own decision below.
+            DeepSeek reads the form and document text, then briefs you. You still open the files and record the award.
           </p>
         </div>
         <Button
@@ -121,7 +132,7 @@ export function ScreeningPanel({
             })
           }
         >
-          Re-run checks
+          {deepSeekReady ? "Ask DeepSeek to screen" : "Re-run rule checks"}
         </Button>
       </CardHeader>
       <CardBody className="space-y-4">
@@ -141,6 +152,7 @@ export function ScreeningPanel({
               The completeness score is a rule-based hint (documents, eligibility, duplicates). It is not a grade and does not approve or reject the student.
             </p>
             <p className="text-sm leading-6 text-[#3f3a34]">{result.summary}</p>
+            <DeepSeekBrief result={result} deepSeekReady={deepSeekReady} />
             {result.documents?.length ? (
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-wide text-[var(--huef-green)]">Document flags</p>
@@ -221,6 +233,119 @@ export function ScreeningPanel({
             <p className="text-xs text-[#6f675c]">Last run {formatDateTime(result.runAt)} · {result.version}</p>
           </>
         )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function DeepSeekBrief({
+  result,
+  deepSeekReady,
+}: {
+  result: ScreeningResult;
+  deepSeekReady: boolean;
+}) {
+  const ds = result.deepseek;
+  if (!deepSeekReady && !ds?.used) {
+    return (
+      <Alert tone="warning">
+        DeepSeek is not configured. An administrator can paste a DeepSeek API key under Settings. Rule-based checks still run so coordinators are not blocked.
+      </Alert>
+    );
+  }
+  if (ds?.error && !ds.used) {
+    return <Alert tone="warning">{ds.error}</Alert>;
+  }
+  if (!ds?.used) {
+    return (
+      <Alert tone="info">
+        Rule checks are ready. Click <strong>Ask DeepSeek to screen</strong> to generate a coordinator briefing, remaining checks, and a draft note for the applicant.
+      </Alert>
+    );
+  }
+  return (
+    <div className="space-y-3 rounded-lg border border-[#cfe3d6] bg-[#f4fbf6] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-[var(--huef-green-dark)]">DeepSeek briefing</p>
+        <Badge tone="green">{ds.model}</Badge>
+      </div>
+      <p className="text-sm leading-6 text-[#3f3a34]">{ds.brief}</p>
+      {ds.suggestedDecisionLabel ? (
+        <p className="text-sm">
+          <span className="font-semibold">Suggested next step: </span>
+          {ds.suggestedDecisionLabel}
+          <span className="text-[#6f675c]"> — you still record the official decision.</span>
+        </p>
+      ) : null}
+      {ds.remainingChecks?.length ? (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--huef-green)]">Still check by eye</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-[#3f3a34]">
+            {ds.remainingChecks.map((item, index) => (
+              <li key={`${index}-${item.slice(0, 24)}`}>{item}</li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+      {ds.draftApplicantNote ? (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--huef-green)]">Draft note for the applicant</p>
+          <p className="rounded-md bg-white px-3 py-2 text-sm leading-6 text-[#3f3a34]">{ds.draftApplicantNote}</p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => window.dispatchEvent(new CustomEvent("huef-use-draft-note", { detail: ds.draftApplicantNote }))}
+          >
+            Use this note in the decision box
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function DeepSeekDeskActions({ ready }: { ready: boolean }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  return (
+    <Card>
+      <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-bold text-[var(--huef-green-dark)]">DeepSeek screening desk</p>
+          <p className="text-sm text-[#5c564c]">
+            {ready
+              ? "Screen the oldest pending file with DeepSeek. It drafts the briefing so you only confirm the documents and record the decision."
+              : "Add a DeepSeek API key in Admin → Settings to let the model brief each pending file."}
+          </p>
+          {error ? <Alert tone="error" className="mt-2">{error}</Alert> : null}
+          {message ? <Alert tone="success" className="mt-2">{message}</Alert> : null}
+        </div>
+        <Button
+          type="button"
+          disabled={pending || !ready}
+          onClick={() =>
+            startTransition(async () => {
+              setError(null);
+              const result = await screenNextPendingWithDeepSeek();
+              if (result && "error" in result) {
+                setError(result.error ?? "DeepSeek could not screen the next file.");
+                return;
+              }
+              setMessage(result?.message ?? "DeepSeek finished.");
+              if (result && "applicationId" in result && result.applicationId) {
+                router.push(`/coordinator/applications/${result.applicationId}`);
+                return;
+              }
+              router.refresh();
+            })
+          }
+        >
+          {pending ? "DeepSeek is reading…" : "Screen next pending file"}
+        </Button>
       </CardBody>
     </Card>
   );
