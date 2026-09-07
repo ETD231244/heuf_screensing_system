@@ -40,6 +40,7 @@ export type QueueRow = {
   screening: string;
   screeningLabel: string;
   submittedAt: string | null;
+  submittedLabel: string;
 };
 
 export type CoordinatorDashboardData = {
@@ -74,7 +75,8 @@ function dayKey(date: Date) {
 }
 
 function dayLabel(date: Date) {
-  return date.toLocaleDateString("en-PG", { day: "numeric", month: "short" });
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${date.getDate()} ${months[date.getMonth()]}`;
 }
 
 export async function loadCoordinatorDashboard(): Promise<CoordinatorDashboardData> {
@@ -185,6 +187,7 @@ export async function loadCoordinatorDashboard(): Promise<CoordinatorDashboardDa
         ? SCREENING_STATUS_LABELS[row.screeningStatus as ScreeningStatus] ?? row.screeningStatus
         : "Not screened",
       submittedAt: row.submittedAt?.toISOString() ?? null,
+      submittedLabel: row.submittedAt ? dayLabel(row.submittedAt) : "—",
     }));
 
   return {

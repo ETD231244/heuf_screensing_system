@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { Badge, Card, CardBody, CardHeader, CardTitle, statusTone } from "@/components/ui/card";
-import { formatDate } from "@/lib/utils";
 import type {
   CoordinatorDashboardData,
   NamedCount,
@@ -45,7 +44,7 @@ export function CoordinatorLiveDashboard({ initialData }: { initialData: Coordin
   const [live, setLive] = useState(true);
   const [updatedAt, setUpdatedAt] = useState(() => new Date(initialData.generatedAt));
   const [, startTransition] = useTransition();
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +72,7 @@ export function CoordinatorLiveDashboard({ initialData }: { initialData: Coordin
 
     timer = window.setTimeout(poll, POLL_MS);
     const clock = window.setInterval(() => setNow(Date.now()), 1000);
+    setNow(Date.now());
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -80,7 +80,7 @@ export function CoordinatorLiveDashboard({ initialData }: { initialData: Coordin
     };
   }, []);
 
-  const secondsAgo = Math.max(0, Math.round((now - updatedAt.getTime()) / 1000));
+  const secondsAgo = now == null ? 0 : Math.max(0, Math.round((now - updatedAt.getTime()) / 1000));
 
   return (
     <section className="space-y-5" aria-label="Live coordinator dashboard">
@@ -104,8 +104,8 @@ export function CoordinatorLiveDashboard({ initialData }: { initialData: Coordin
             className={`h-2.5 w-2.5 rounded-full ${live ? "animate-pulse bg-[#1b7a4a]" : "bg-[#c41e3a]"}`}
           />
           {live ? "Live" : "Paused"}
-          <span className="font-normal text-[#6f675c]">
-            · updated {secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}
+          <span className="font-normal text-[#6f675c]" suppressHydrationWarning>
+            · {now == null || secondsAgo < 5 ? "updated just now" : `updated ${secondsAgo}s ago`}
           </span>
         </div>
       </div>
@@ -287,11 +287,15 @@ function AreaChart({ points }: { points: Array<{ date: string; label: string; co
         <polygon points={area} fill="rgba(11,77,44,0.12)" />
         <polyline points={line} fill="none" stroke="#0b4d2c" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {coords.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r="3" fill="#f0c000" stroke="#0b4d2c" strokeWidth="1.5">
-            <title>
-              {point.label}: {point.count}
-            </title>
-          </circle>
+          <circle
+            key={point.date}
+            cx={point.x}
+            cy={point.y}
+            r="3"
+            fill="#f0c000"
+            stroke="#0b4d2c"
+            strokeWidth="1.5"
+          />
         ))}
       </svg>
       <div className="mt-1 flex justify-between text-xs text-[#8a8173]">
@@ -416,7 +420,7 @@ function AttentionTable({ rows }: { rows: CoordinatorDashboardData["attentionQue
             <td className="px-4 py-3">
               <span className="font-semibold text-[var(--huef-green-dark)]">{row.name}</span>
               <span className="mt-0.5 block text-xs text-[#6f675c]">
-                {row.institution} · {formatDate(row.submittedAt)}
+                {row.institution} · {row.submittedLabel}
               </span>
             </td>
             <td className="px-3 py-3">
