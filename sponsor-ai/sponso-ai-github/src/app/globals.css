@@ -46,3 +46,11 @@ table {
   max-width: 100%;
   overflow-x: auto;
 }
+
+table.data-grid {
+  display: table;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+  border-collapse: collapse;
+}

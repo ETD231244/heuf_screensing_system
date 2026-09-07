@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireCoordinator } from "@/lib/auth";
-import { Badge, Card, CardBody, CardHeader, CardTitle, statusTone } from "@/components/ui/card";
+import { Badge, Card, CardBody, statusTone } from "@/components/ui/card";
 import {
   ACADEMIC_YEAR,
-  HELA_DISTRICTS,
   SCREENING_STATUS_LABELS,
   STATUS_LABELS,
   type ScreeningStatus,
 } from "@/lib/constants";
 import { CoordinatorFilters } from "@/components/coordinator-filters";
+import { CoordinatorLiveDashboard } from "@/components/coordinator-live-dashboard";
+import { loadCoordinatorDashboard } from "@/lib/coordinator-dashboard";
 import { formatDate, fullName } from "@/lib/utils";
 import { parseScreening } from "@/lib/types";
 import { recommendationLabel } from "@/lib/screening";
@@ -30,7 +31,7 @@ export default async function CoordinatorPage({
 }) {
   await requireCoordinator();
   const params = await searchParams;
-  const [institutions, applications, counts, allSubmitted] = await Promise.all([
+  const [institutions, applications, dashboard] = await Promise.all([
     prisma.institution.findMany({ orderBy: { code: "asc" } }),
     prisma.application.findMany({
       where: {
@@ -61,32 +62,8 @@ export default async function CoordinatorPage({
       },
       orderBy: { submittedAt: "desc" },
     }),
-    prisma.application.groupBy({
-      by: ["status"],
-      where: { academicYear: ACADEMIC_YEAR, status: { not: "DRAFT" } },
-      _count: { _all: true },
-    }),
-    prisma.application.findMany({
-      where: { academicYear: ACADEMIC_YEAR, status: { not: "DRAFT" } },
-      include: { applicant: { include: { district: true } } },
-    }),
+    loadCoordinatorDashboard(),
   ]);
-
-  const byStatus = Object.fromEntries(counts.map((row) => [row.status, row._count._all]));
-  const flagged = allSubmitted.filter(
-    (row) => row.screeningStatus && row.screeningStatus !== "PASSED_INITIAL",
-  ).length;
-  const awaiting = allSubmitted.filter((row) => row.status === "PENDING").length;
-  const review = allSubmitted.filter(
-    (row) => row.screeningStatus === "NEEDS_REVIEW" || row.screeningStatus === "UNABLE_TO_DETERMINE",
-  ).length;
-  const incomplete = allSubmitted.filter(
-    (row) => row.status === "MORE_INFO" || row.screeningStatus === "MISSING_REQUIRED",
-  ).length;
-  const districtCounts = HELA_DISTRICTS.map((name) => ({
-    name,
-    count: allSubmitted.filter((row) => row.applicant.district?.name === name).length,
-  }));
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 lg:px-8">
@@ -99,30 +76,7 @@ export default async function CoordinatorPage({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Summary label="Total submitted" value={allSubmitted.length} />
-        <Summary label="Awaiting screening" value={awaiting} />
-        <Summary label="AI-flagged" value={flagged} />
-        <Summary label="Needs manual review" value={review} />
-        <Summary label="Incomplete / more info" value={incomplete} />
-        <Summary label="Approved" value={byStatus.APPROVED ?? 0} />
-        <Summary label="Not successful" value={byStatus.REJECTED ?? 0} />
-        <Summary label="New (last 7 days)" value={allSubmitted.filter((row) => row.submittedAt && Date.now() - row.submittedAt.getTime() < 7 * 86400000).length} />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Count by Hela district</CardTitle>
-        </CardHeader>
-        <CardBody className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {districtCounts.map((row) => (
-            <div key={row.name} className="rounded-lg bg-[var(--huef-cream)] px-3 py-3">
-              <p className="text-sm font-semibold text-[var(--huef-green-dark)]">{row.name}</p>
-              <p className="text-2xl font-extrabold text-[var(--huef-green)]">{row.count}</p>
-            </div>
-          ))}
-        </CardBody>
-      </Card>
+      <CoordinatorLiveDashboard initialData={dashboard} />
 
       <CoordinatorFilters
         institutions={institutions}
@@ -202,16 +156,5 @@ export default async function CoordinatorPage({
         </div>
       )}
     </div>
-  );
-}
-
-function Summary({ label, value }: { label: string; value: number }) {
-  return (
-    <Card>
-      <CardBody>
-        <p className="text-sm text-[#6f675c]">{label}</p>
-        <p className="text-3xl font-extrabold text-[var(--huef-green)]">{value}</p>
-      </CardBody>
-    </Card>
   );
 }
