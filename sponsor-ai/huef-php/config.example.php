@@ -1,7 +1,10 @@
 <?php
 /**
- * Copy this file to config.php and fill in your MySQL details.
- * InfinityFree: use the host / database / user shown in the control panel.
+ * XAMPP: these defaults work (root, empty password) once you create
+ * the huef_screening database and import sql/schema.sql then sql/seed.sql.
+ *
+ * InfinityFree / other hosts: copy this file to config.php and paste
+ * the host, database, user, and password from the control panel.
  */
 return [
     'db' => [
