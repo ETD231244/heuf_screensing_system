@@ -1,26 +1,16 @@
 <?php
 require dirname(__DIR__) . '/includes/bootstrap.php';
 $user = huef_require_role(['COORDINATOR', 'ADMIN']);
-$filter = huef_post('status') ?: ($_GET['status'] ?? '');
-$q = trim((string) ($_GET['q'] ?? ''));
-$sql = 'SELECT ap.*, a.given_name, a.surname, a.phone, i.code AS institution_code, i.name AS institution_name, d.name AS district_name
-        FROM applications ap
-        JOIN applicants a ON a.id = ap.applicant_id
-        JOIN institutions i ON i.id = ap.institution_id
-        LEFT JOIN districts d ON d.id = ap.district_id
-        WHERE ap.status <> "DRAFT"';
-$params = [];
-if ($filter && in_array($filter, ['PENDING','MORE_INFO','APPROVED','REJECTED'], true)) {
-    $sql .= ' AND ap.status = ?';
-    $params[] = $filter;
-}
-if ($q !== '') {
-    $sql .= ' AND (a.given_name LIKE ? OR a.surname LIKE ? OR a.phone LIKE ? OR ap.program_name LIKE ?)';
-    $like = '%' . $q . '%';
-    array_push($params, $like, $like, $like, $like);
-}
-$sql .= ' ORDER BY ap.submitted_at DESC';
-$list = huef_all($sql, $params);
+
+$list = huef_all(
+    'SELECT ap.*, a.given_name, a.surname, a.phone, i.code AS institution_code, i.name AS institution_name, d.name AS district_name
+     FROM applications ap
+     JOIN applicants a ON a.id = ap.applicant_id
+     JOIN institutions i ON i.id = ap.institution_id
+     LEFT JOIN districts d ON d.id = ap.district_id
+     WHERE ap.status <> "DRAFT"
+     ORDER BY ap.submitted_at DESC'
+);
 $data = huef_coordinator_dashboard();
 
 huef_start();
@@ -28,7 +18,7 @@ huef_start();
 <div data-live-dashboard="<?= huef_h(huef_url('api/dashboard.php')) ?>">
   <p class="tiny">Coordinator desk · live every 8 seconds</p>
   <h1 style="margin:0.2rem 0 0.2rem;color:var(--huef-green-dark)">Applications</h1>
-  <p class="muted">Updated <span data-generated><?= huef_h($data['generatedAt']) ?></span>. DeepSeek briefs; officers decide.</p>
+  <p class="muted">Updated <span data-generated><?= huef_h($data['generatedAt']) ?></span>. Screen every lodged file here. Print or download approved lists from <a href="<?= huef_h(huef_url('coordinator/reports.php')) ?>">Reports</a>.</p>
   <div class="grid grid-3" style="margin:1rem 0">
     <div class="kpi">Awaiting decision<b data-kpi="awaiting"><?= (int) $data['totals']['awaiting'] ?></b></div>
     <div class="kpi">Flagged by screening<b data-kpi="flagged"><?= (int) $data['totals']['flagged'] ?></b></div>
@@ -68,23 +58,6 @@ huef_start();
   </div>
 </div>
 
-<form method="get" class="card" style="margin-top:1rem;display:flex;gap:0.6rem;flex-wrap:wrap;align-items:end">
-  <div style="flex:1;min-width:12rem">
-    <label>Search</label>
-    <input name="q" value="<?= huef_h($q) ?>" placeholder="Name, phone, programme">
-  </div>
-  <div>
-    <label>Status</label>
-    <select name="status">
-      <option value="">All lodged</option>
-      <?php foreach (['PENDING','MORE_INFO','APPROVED','REJECTED'] as $st): ?>
-        <option value="<?= $st ?>"<?= huef_selected($st, $filter) ?>><?= huef_h(huef_status_label($st)) ?></option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-  <button class="btn btn-green" type="submit">Filter</button>
-</form>
-
 <div class="table-wrap card" style="margin-top:1rem;padding:0">
   <table class="data-grid">
     <thead><tr><th>Applicant</th><th>Institution</th><th>Status</th><th>Screening</th><th>Submitted</th></tr></thead>
@@ -98,6 +71,9 @@ huef_start();
         <td><?= huef_h(huef_dt($row['submitted_at'])) ?></td>
       </tr>
     <?php endforeach; ?>
+    <?php if (!$list): ?>
+      <tr><td colspan="5">No lodged applications yet.</td></tr>
+    <?php endif; ?>
     </tbody>
   </table>
 </div>

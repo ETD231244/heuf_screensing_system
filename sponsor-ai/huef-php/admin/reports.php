@@ -5,7 +5,7 @@ $data = huef_coordinator_dashboard();
 huef_start();
 ?>
 <h1 style="margin-top:0;color:var(--huef-green-dark)">Reports</h1>
-<p class="muted">Same 2026 snapshot the coordinator desk uses.</p>
+<p class="muted">2026 TFA snapshot. To print or download <strong>approved</strong> applicants by district and institution, open the <a href="<?= huef_h(huef_url('coordinator/reports.php')) ?>">coordinator Reports</a> page.</p>
 <div class="grid grid-3">
   <div class="kpi">Lodged<b><?= (int) $data['totals']['submitted'] ?></b></div>
   <div class="kpi">Approved<b><?= (int) $data['totals']['approved'] ?></b></div>

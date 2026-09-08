@@ -1,5 +1,42 @@
 <?php
 
+function huef_safe_lookup_id(string $id): ?string
+{
+    $id = trim($id);
+    if ($id === '' || !preg_match('/^[A-Za-z0-9_-]{1,36}$/', $id)) {
+        return null;
+    }
+    return $id;
+}
+
+function huef_approved_report_rows(?string $districtId = null, ?string $institutionId = null): array
+{
+    $sql = 'SELECT ap.id, ap.program_name, ap.year_of_study, ap.status, ap.screening_status, ap.submitted_at,
+                   a.given_name, a.surname, a.phone, u.email,
+                   i.code AS institution_code, i.name AS institution_name,
+                   d.name AS district_name, l.name AS llg_name
+            FROM applications ap
+            JOIN applicants a ON a.id = ap.applicant_id
+            JOIN users u ON u.id = a.user_id
+            JOIN institutions i ON i.id = ap.institution_id
+            LEFT JOIN districts d ON d.id = ap.district_id
+            LEFT JOIN llgs l ON l.id = a.llg_id
+            WHERE ap.status = "APPROVED"';
+    $params = [];
+    $districtId = $districtId ? huef_safe_lookup_id($districtId) : null;
+    $institutionId = $institutionId ? huef_safe_lookup_id($institutionId) : null;
+    if ($districtId) {
+        $sql .= ' AND ap.district_id = ?';
+        $params[] = $districtId;
+    }
+    if ($institutionId) {
+        $sql .= ' AND ap.institution_id = ?';
+        $params[] = $institutionId;
+    }
+    $sql .= ' ORDER BY i.name, a.surname, a.given_name';
+    return huef_all($sql, $params);
+}
+
 function huef_coordinator_dashboard(): array
 {
     $year = huef_current_period()['academic_year'] ?? '2026';

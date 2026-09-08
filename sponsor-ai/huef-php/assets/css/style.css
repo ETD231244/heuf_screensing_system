@@ -208,6 +208,20 @@ table.data-grid { width: 100%; border-collapse: collapse; display: table; font-s
 .legend { display: flex; flex-wrap: wrap; gap: 0.7rem; font-size: 0.8rem; margin-top: 0.5rem; }
 .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.3rem; }
 
+.btn-outline-dark {
+  background: #fff;
+  border: 1px solid #172019;
+  color: #172019;
+}
+.coord-filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1rem;
+  align-items: end;
+}
+.coord-filter-panel > div { min-width: 16rem; flex: 1; }
+.coord-filter-panel .btn-row { flex: 1 1 100%; }
+
 .doc-list { list-style: none; padding: 0; margin: 0; }
 .doc-list li { display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
 
