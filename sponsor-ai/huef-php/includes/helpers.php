@@ -132,9 +132,9 @@ function huef_role_label(string $role): string
 function huef_workspace_label(string $role): string
 {
     $map = [
-        'ADMIN' => 'Administrator',
-        'COORDINATOR' => 'Coordinator',
-        'STUDENT' => 'Applicant',
+        'ADMIN' => 'Administrator desk',
+        'COORDINATOR' => 'Coordinator desk',
+        'STUDENT' => 'Applicant desk',
     ];
     return $map[$role] ?? 'HUEF';
 }

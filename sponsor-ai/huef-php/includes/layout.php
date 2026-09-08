@@ -59,11 +59,12 @@ function huef_flash_html(): string
     return '<div class="alert ' . $tone . '" role="status">' . huef_h($flash['message']) . '</div>';
 }
 
-function huef_render(array $user, string $title, string $content): void
+function huef_render(array $user, string $title, string $content, array $opts = []): void
 {
     $unread = huef_unread_count($user['id']);
     $nav = huef_nav_for($user);
-    $display = huef_full_name($user) ?: $user['email'];
+    $display = $user['email'];
+    $headerAction = $opts['header_action'] ?? '';
     ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,7 +82,7 @@ function huef_render(array $user, string $title, string $content): void
       <span class="emblem emblem-white" aria-hidden="true"></span>
       <span>
         <strong>HUEF</strong>
-        <small><?= huef_h(huef_workspace_label($user['role'])) ?> desk</small>
+        <small><?= huef_h(strtoupper($user['role'] === 'COORDINATOR' ? 'Coordinator desk' : huef_workspace_label($user['role']))) ?></small>
       </span>
     </a>
     <p class="nav-label">Navigation</p>
@@ -116,6 +117,7 @@ function huef_render(array $user, string $title, string $content): void
         <p class="app-sub">Hela Undialu Education Foundation · 2026 TFA</p>
       </div>
       <div class="app-top-right">
+        <?= $headerAction ?>
         <a class="icon-link<?= $unread ? ' has-unread' : '' ?>" href="<?= huef_h(huef_url('notifications.php')) ?>" aria-label="Notifications">🔔</a>
         <span class="email-chip"><?= huef_h($user['email']) ?></span>
       </div>

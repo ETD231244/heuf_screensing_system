@@ -13,45 +13,50 @@ $data = huef_coordinator_dashboard();
 
 huef_start();
 ?>
-<p class="tiny">Approved sponsorship records</p>
-<h1 style="margin:0.2rem 0 0.4rem;color:var(--huef-green-dark)">Reports</h1>
-<p class="muted">Filter <strong>approved</strong> applicants by the Hela district and institution they applied from, then print the report or download CSV. Pending, rejected, draft, and more-information files never appear here.</p>
+<h1 class="page-h1">Reports</h1>
+<p class="lede">Filter approved applicants by their Hela district and institution, then print the report or download it as a CSV file.</p>
 
-<div class="grid grid-3" style="margin:1rem 0">
-  <div class="kpi">Total submitted<b><?= (int) $data['totals']['submitted'] ?></b><span class="muted">All lodged applications</span></div>
-  <div class="kpi">Total approved<b><?= (int) $data['totals']['approved'] ?></b><span class="muted">Available for reporting</span></div>
-  <div class="kpi">Matching report<b><?= count($approved) ?></b><span class="muted">Approved applicants matching the filters</span></div>
+<div class="grid grid-3" style="margin:1.1rem 0 1.2rem">
+  <div class="kpi">
+    <span>Total submitted</span>
+    <b><?= (int) $data['totals']['submitted'] ?></b>
+    <small>All lodged applications</small>
+  </div>
+  <div class="kpi">
+    <span>Total approved</span>
+    <b><?= (int) $data['totals']['approved'] ?></b>
+    <small>Available for reporting</small>
+  </div>
+  <div class="kpi">
+    <span>Matching report</span>
+    <b><?= count($approved) ?></b>
+    <small>Approved applicants matching the current filters</small>
+  </div>
 </div>
 
-<form method="get" class="card coord-filter-panel">
-  <div>
-    <label for="district_id">District applied from</label>
-    <select id="district_id" name="district_id">
+<section class="card report-builder">
+  <h2>Build an approved-applicant report</h2>
+  <form method="get" class="report-builder-form">
+    <select name="district_id" aria-label="District">
       <option value="">All Hela districts</option>
       <?php foreach ($districts as $row): ?>
         <option value="<?= huef_h($row['id']) ?>"<?= huef_selected($row['id'], $districtId) ?>><?= huef_h($row['name']) ?></option>
       <?php endforeach; ?>
     </select>
-  </div>
-  <div>
-    <label for="institution_id">Institution applied to</label>
-    <select id="institution_id" name="institution_id">
+    <select name="institution_id" aria-label="Institution">
       <option value="">All institutions</option>
       <?php foreach ($institutions as $row): ?>
         <option value="<?= huef_h($row['id']) ?>"<?= huef_selected($row['id'], $institutionId) ?>><?= huef_h($row['code'] . ' · ' . $row['name']) ?></option>
       <?php endforeach; ?>
     </select>
-  </div>
-  <div class="btn-row" style="align-self:end">
     <button class="btn btn-green" type="submit">Apply filters</button>
-    <a class="btn btn-outline" style="color:var(--huef-green)" href="<?= huef_h(huef_url('coordinator/reports.php')) ?>">Clear filters</a>
-    <button class="btn btn-outline-dark" type="submit" formaction="<?= huef_h(huef_url('coordinator/report.php')) ?>" formtarget="_blank" name="format" value="print">Print / Save PDF</button>
+    <button class="btn btn-print" type="submit" formaction="<?= huef_h(huef_url('coordinator/report.php')) ?>" formtarget="_blank" name="format" value="print">Print / Save PDF</button>
     <button class="btn btn-gold" type="submit" formaction="<?= huef_h(huef_url('coordinator/report.php')) ?>" name="format" value="csv">Download CSV</button>
-  </div>
-</form>
+  </form>
+</section>
 
-<div class="table-wrap card" style="margin-top:1rem;padding:0">
-  <table class="data-grid">
+<div class="table-wrap card desk-card" style="margin-top:1rem">
+  <table class="data-grid desk-table">
     <thead>
       <tr>
         <th>No.</th>
@@ -68,11 +73,18 @@ huef_start();
         <td><?= (int) $index + 1 ?></td>
         <td>
           <strong><?= huef_h(huef_full_name($row)) ?></strong>
-          <div class="muted"><?= huef_h($row['email']) ?> · <?= huef_h($row['phone']) ?></div>
+          <span class="sub"><?= huef_h($row['email']) ?></span>
+          <span class="sub"><?= huef_h($row['phone']) ?></span>
         </td>
-        <td><?= huef_h($row['district_name'] ?? '—') ?><div class="muted"><?= huef_h($row['llg_name'] ?? '—') ?></div></td>
+        <td>
+          <strong><?= huef_h($row['district_name'] ?? '—') ?></strong>
+          <span class="sub"><?= huef_h($row['llg_name'] ?? '—') ?></span>
+        </td>
         <td><?= huef_h($row['institution_code'] . ' · ' . $row['institution_name']) ?></td>
-        <td><?= huef_h($row['program_name']) ?><div class="muted"><?= huef_h($row['year_of_study']) ?></div></td>
+        <td>
+          <strong><?= huef_h($row['program_name']) ?></strong>
+          <span class="sub"><?= huef_h($row['year_of_study']) ?></span>
+        </td>
         <td><span class="badge <?= huef_status_class('APPROVED') ?>"><?= huef_h(huef_status_label('APPROVED')) ?></span></td>
       </tr>
     <?php endforeach; ?>
